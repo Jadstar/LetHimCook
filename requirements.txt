@@ -1,0 +1,7 @@
+swift
+ir_support
+roboticstoolbox-python
+spatialmath
+numpy
+math
+matplotlib
