@@ -22,10 +22,10 @@ class FetchRobot(DHRobot3D):
     
     def __init__(self):
         self.link3D_names = dict(link0 = 'fetch_meshes/base_link', color0 = (0.8,0.8,0.8,1),      # color option only takes effect for stl file
-                            link1 = 'fetch_meshes/l_wheel_link',color1 = (0.8,0.8,0.8,1),
-                            link2 = 'fetch_meshes/r_wheel_link',color2 = (0.8,0.8,0.8,1),
+                            # link1 = 'fetch_meshes/l_wheel_link',color1 = (0.8,0.8,0.8,1),
+                            # link2 = 'fetch_meshes/r_wheel_link',color2 = (0.8,0.8,0.8,1),
                             link3 = 'fetch_meshes/torso_lift_link',color3 = (0.8,0.8,0.8,1),
-                            link4 = 'fetch_meshes/bellows_link',color4 = (0.8,0.8,0.8,1),
+                            # link4 = 'fetch_meshes/bellows_link',color4 = (0.8,0.8,0.8,1),
                             link5 = 'fetch_meshes/head_pan_link',color5 = (0.8,0.8,0.8,1),
                             link6 = 'fetch_meshes/shoulder_pan_link', color6 = (0.8,0.8,0.8,1),
                             link7 = 'fetch_meshes/shoulder_lift_link', color7 = (0.8,0.8,0.8,1),
@@ -34,8 +34,8 @@ class FetchRobot(DHRobot3D):
                             link10 = 'fetch_meshes/forearm_roll_link', color10 = (0.8,0.8,0.8,1),
                             link11 = 'fetch_meshes/wrist_flex_link',color11 = (0.8,0.8,0.8,1),
                             link12 = 'fetch_meshes/wrist_roll_link',color12 = (0.8,0.8,0.8,1),
-                            link13 = 'fetch_meshes/l_gripper_finger_link',color13 = (0.8,0.8,0.8,1),
-                            link14 = 'fetch_meshes/r_gripper_finger_link',color14 = (0.8,0.8,0.8,1)
+                            link13 = 'fetch_meshes/l_gripper_finger_link.STL',color13 = (0.8,0.8,0.8,1),
+                            link14 = 'fetch_meshes/r_gripper_finger_link.STL',color14 = (0.8,0.8,0.8,1)
                             )
         self.loadModel()
     
