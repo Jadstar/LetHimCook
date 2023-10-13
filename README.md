@@ -29,6 +29,7 @@ pip install -r requirements.txt
 
 | Version           | Date           | Description                                                                     |
 |-----------------|----------------|---------------------------------------------------------------------------------|
+| V0.2      | 13/10/23      | Fetch Robot and Assembly Robot Meshes in Environment.  
 | V0.1      | 8/10/23      | Repository tidied and updated, beginning of 'real' progress.  
 | V0.05            | 3/10/23      | Meshes and Rough Implementation for Fetch Robot.  
 | V0.01            | 19/9/23      | Repository Created. |
