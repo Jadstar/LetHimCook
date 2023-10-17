@@ -65,6 +65,10 @@ class FetchRobot(DHRobot3D):
             - UR3
 
         UPDATES:
+
+        Attempt 4: 16/10/2023
+        Jared: Cannot figure it out and finds the fetch robot in roboticstoolbox. AWESOME :(
+
         Attempt 3: 15/10/23:
         Jaden: When setting the DH models it seems that the origin 'q' will always stay at origin, so changing transformation to account for that. 
 
