@@ -98,18 +98,51 @@ class FetchRobot(DHRobot3D):
         # Shifting Model up so appears to sit on plane
         self.base = self.base * SE3(0.12,0,0.6675)
         self.q = qtest
+    
+    def test2(self):
+        """
+        Test the class by adding 3d objects into a new Swift window and do a simple movement
+        """
+        env = swift.Swift()
+        env.launch(realtime= True)
+        # self.add_to_env(env)
+        fetch = rtb.models.Fetch()
+        print(fetch.q)
+        # Add the robot to the simulator
+        env.add(fetch)
+
+        q_goal = [fetch.q[i]-pi/3 for i in range(len(fetch.q))]
+        # q_goal[0] = self.q[0]
+        # q_goal[0] = -1 # Move the rail link
+        qtraj = rtb.jtraj(fetch.q, q_goal, 50).q
+
+
+        fig = self.plot(self.q, limits= [-1,1,-1,1,-1,1])
+        fig._add_teach_panel(self, self.q)
+
+        # env.hold()
+        for q in qtraj:
+            fetch.q = q
+            env.step(0.02)
+            fig.step(0.01)
+            # time.sleep(1)
+        fig.hold()
+        env.hold()
+        # time.sleep(3)    
     def test(self):
         """
         Test the class by adding 3d objects into a new Swift window and do a simple movement
         """
         env = swift.Swift()
         env.launch(realtime= True)
-        self.q = self._qtest        
         self.add_to_env(env)
+        
         q_goal = [self.q[i]-pi/3 for i in range(self.n)]
         # q_goal[0] = self.q[0]
         # q_goal[0] = -1 # Move the rail link
         qtraj = rtb.jtraj(self.q, q_goal, 50).q
+
+
         fig = self.plot(self.q, limits= [-1,1,-1,1,-1,1])
         fig._add_teach_panel(self, self.q)
 
@@ -124,8 +157,9 @@ class FetchRobot(DHRobot3D):
         # time.sleep(3)    
 
 if __name__ == "__main__":  
-    r = FetchRobot()
-    r.test()
+    r = FetchRobot()    
+    # r.test()    # The original
+    r.test2()   # NEW
 
 
     
