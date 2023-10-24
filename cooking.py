@@ -10,6 +10,7 @@ from spatialmath import SE3
 import os
 import spatialgeometry as geometry
 import numpy as np
+from math import pi
 
 ROOM_TEMP = 20  # in Celsius
 FLIP_TEMP = 70  # temperature to flip the patty
@@ -21,6 +22,7 @@ patty_position = (0,1,0)
 above_patty = (0,1,.5)
 plate_position = (0,2,0)
 above_plate = (0,2,0.5)
+
 class Patty:
     def __init__(self, position, env):
         '''
@@ -103,31 +105,85 @@ class CookingRobot:
     Spatula - To Flip the Burgers
 
     '''
-    def __init__(self, env):
-        self.env = env
+    def __init__(self):
+     
         self.robot = Fetch()
         self.camera = FetchCamera()
-        self.spatula_mount = ''
-        self.spatula = ''
-        patty_position = (0, 0, 0)
-        self.patty = Patty(patty_position, self.env)  # Provide the position and environment when creating the Patty
+        spatula_mount_path = 'fetch_robotdata/accessories/SpatulaMount.STL'
+        spatula_path = 'fetch_robotdata/accessories/Spatula.stl'
 
+        #Moving Spatula to correct place
+        self.spatula_offset = SE3(0,0,-0.07)
+        self.mount_offset = SE3(-0.085,0,0)
+
+        spatula_pose = self.robot.fkine(self.robot.q).A * SE3.Rz(pi/2) * self.spatula_offset
+        spatula_mount_pose = self.robot.fkine(self.robot.q).A * self.mount_offset
+        
+        #Creating Meshes
+        self.spatula = geometry.Mesh(spatula_path, pose =spatula_pose,scale=[0.01,0.01,0.01])
+        self.spatula_mount = geometry.Mesh(spatula_mount_path, pose =spatula_mount_pose, scale=[0.001,0.001,0.001])
+
+        #Adding to Swift environment
 
         # Initialization
         self.patty_flipped = False
         self.patty_is_cooked = False
 
-    def CookRobotMove(self,coords,rot_angle,axis):
+    def fetch_fkine(self,q):
+        '''
+        Calculate the forward kinematics of robot as the last link is not the exact end effector
+        '''
+        
+    def AddtoEnv(self,env):
+        env.add(self.robot)
+        env.add(self.camera)
+        env.add(self.spatula)
+        env.add(self.spatula_mount)
+
+    def MotionTest(self):
+        '''
+        Testing the motion of components together
+        '''
+        env = swift.Swift()
+        env.launch(realtime= True)
+        self.AddtoEnv(env)
+
+        goal_test = SE3(1,1,1)
+
+        q_goal = self.robot.ikine_LM(goal_test,joint_limits=True).q
+        # q_goal = [-pi/3, -pi/3,  -pi/3,  0 , 0,  0, -1.06027914,  1.42696591,  1.70241279, -0.68058669]
+        qtraj = rtb.jtraj(self.robot.q, q_goal,50).q
+
+        for q in qtraj:
+            self.CookMove(q)
+            env.step(0.02)
+        env.hold()
+
+
+    def CookMove(self,q):
         '''
         Very Similar to how SE3 works but makes sure that everything moves with each other
         (i.e. arm, camera and spatula all move together)
+
+        For some reason the prismatic torso lift is allowed to have a q value < 0 even though it has limit on it??
+        Specify that q[3] has to be always greater than 0 and less than limit to get correct end effector
         '''
-        if coords is not None:
-            self.robot.base = SE3(coords)
-            self.camera = SE3(coords)
-            self.spatula = SE3(coords)
-            self.spatula_mount = SE3(coords)
-        
+        self.robot.q = q 
+        if q[2] <0 or q[2] > 0.38615:
+            print("invalid q values")
+            if q[2] < 0 :
+                self.robot.q[2] = 0
+            else:
+                self.robot.q[2] = 0.38615
+                
+        tr = self.robot.fkine(self.robot.q).A
+        #moving Gripper as well
+        # print(tr)
+        # print(q)
+        self.spatula.T = tr *  SE3.Rz(pi/2) * self.spatula_offset
+        self.spatula_mount._T = tr * self.mount_offset
+        self.camera.q[:3] = self.robot.q[:3]            # FetchCamera only has 5 links so only uses that are necesary
+    
 
     def locatePatty(self,patty):
         '''
@@ -196,3 +252,11 @@ class CookingRobot:
                 self.patty_is_cooked = True
 
             self.env.step(TIME_STEP)
+
+
+
+if __name__ == "__main__":
+    # env = swift.Swift()
+    # env.launch(realtime= True)
+    r = CookingRobot()
+    r.MotionTest()
