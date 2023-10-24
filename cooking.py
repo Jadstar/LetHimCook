@@ -17,23 +17,24 @@ FLIP_TEMP = 70  # temperature to flip the patty
 DONE_TEMP = 90  # temperature the patty is fully cooked
 TIME_STEP = 0.02  # simulation time step
 
-
 patty_position = (0,1,0)
 above_patty = (0,1,.5)
 plate_position = (0,2,0)
 above_plate = (0,2,0.5)
 
+
 class Patty:
-    def __init__(self, position, env):
+    def __init__(self, position=SE3(0,0,0),env=None):
         '''
         Initializes the Patty in the simulation environment.
         
-        position: A tuple (x, y, z) indicating where the patty should be placed.
+        position: in SE3 Format (x, y, z) indicating where the patty should be placed.
         env: The simulation environment.
+
         '''
+        
         self.position = position
         self.env = env
-
         # Initialize patty temperature to room temperature
         self.temperature = ROOM_TEMP
         
@@ -41,9 +42,26 @@ class Patty:
         self.is_flipped = False
         self.color = self.get_color(self.temperature)
         # Load the patty into the simulation at the given position
-        self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(position), color=self.color)
-        self.env.add(self.mesh)
-        self.update_color()
+        self.scale = [0.0015, 0.0015, 0.0015]
+        self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=position, color=self.color,scale=self.scale)
+        # self.update_color()
+
+    def getPose(self):
+        '''
+        Returns Patty Pose
+        '''
+        return self.mesh.T
+    
+    def setPose(self,pose):
+        '''
+        Sets the position of patty, useful when it needs to be moved
+
+        Position must be in SE3 format
+        '''
+        self.mesh.T = pose
+
+    def AddtoEnv(self,env):
+        env.add(self.mesh)
 
     def heat(self, delta_temp):
         '''
@@ -90,9 +108,9 @@ class Patty:
         self.mesh.color = new_color
         
         # Re-add the patty to the environment to force a visual update
-        self.env.remove(self.mesh)
-        self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.position), scale=[0.005, 0.005, 0.005], color=new_color)
-        self.env.add(self.mesh)
+        self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.position), scale=self.scale, color=new_color)
+        self.AddtoEnv(self.env)
+
         
 
 class CookingRobot:
@@ -115,6 +133,8 @@ class CookingRobot:
         #Moving Spatula to correct place
         self.spatula_offset = SE3(0,0,-0.07)
         self.mount_offset = SE3(-0.085,0,0)
+        #The offset to make sure the end effector is the spatula, not gripper
+        self.patty_offset = SE3(-0.13,0,0.065)
 
         spatula_pose = self.robot.fkine(self.robot.q).A * SE3.Rz(pi/2) * self.spatula_offset
         spatula_mount_pose = self.robot.fkine(self.robot.q).A * self.mount_offset
@@ -129,16 +149,43 @@ class CookingRobot:
         self.patty_flipped = False
         self.patty_is_cooked = False
 
-    def fetch_fkine(self,q):
-        '''
-        Calculate the forward kinematics of robot as the last link is not the exact end effector
-        '''
-        
     def AddtoEnv(self,env):
         env.add(self.robot)
         env.add(self.camera)
         env.add(self.spatula)
         env.add(self.spatula_mount)
+
+
+    def PattyFlipTest(self):
+        '''
+        Testing the robot flipping capabilities
+        '''
+        pattyoffset = SE3(-0.13,0,0.065)    #To ensure the spatula is at the patty, not the gripper
+        env = swift.Swift()
+        env.launch(realtime= True)
+        self.AddtoEnv(env)
+
+        patty = Patty(env=env)
+        patty.setPose(SE3(2,1,1))
+        patty.AddtoEnv(env)
+
+        goal_test = patty.getPose()
+
+        #Flip Patty Function
+        fullq = self.flip_patty(goal_test)
+        # patty_offset = goal_test *pattyoffset 
+
+        # q_goal = self.robot.ikine_LM(patty_offset,joint_limits=True).q
+        # # q_goal = [-pi/3, -pi/3,  -pi/3,  0 , 0,  0, -1.06027914,  1.42696591,  1.70241279, -0.68058669]
+        # qtraj = rtb.jtraj(self.robot.q, q_goal,50).q
+
+        for qtraj in fullq:
+            for q in qtraj:
+                self.CookMove(q)
+                # tr = self.robot.fkine(q).A
+                # patty.setPose(tr * self.patty_offset)
+                env.step(0.02)
+        env.hold()
 
     def MotionTest(self):
         '''
@@ -185,35 +232,56 @@ class CookingRobot:
         self.camera.q[:3] = self.robot.q[:3]            # FetchCamera only has 5 links so only uses that are necesary
     
 
-    def locatePatty(self,patty):
+    def locatePatties(self):
         '''
-        Finds the pose of the patty to be locked into the flip
+        Uses Fetch Camera to Find the patties on the grill
+
+        input: list of patties
+        output: a list of coordinates where the patties are
         '''
+        pattycoords = []
+
+        return pattycoords
 
 
     def flip_patty(self, location):
+        '''
+        Creates a big list of joint values that move the spatula to the patty, and flip it over
+        '''
+        full_qlist = []
+        offset_location = location * self.patty_offset #Offset for the spatula to be in correct position to patty
+        
+
         # 1. Move gripper above the patty
-        q_above_patty = self.robot.ik(above_patty)  # This should be a position above the patty
-        self.robot.q = q_above_patty
+        q1 = self.robot.ikine_LM(offset_location,joint_limits=True)  # This should be a position above the patty
+        if q1.success:
+            qtraj = rtb.jtraj(self.robot.q, q1.q,50).q
+            full_qlist.append(qtraj)
         
-        # 2. Descend to grip the patty
-        q_grip_patty = self.robot.ik(patty_position)  # This should be a position to grip the patty
-        self.robot.q = q_grip_patty
-        
-        # 3. Lift it slightly
-        self.robot.q = q_above_patty
-        
-        # 4. Rotate the wrist (or suitable joint) to flip
-        q_flipped = q_above_patty.copy()
-        q_flipped[-2] += 3.14  # Assuming the second last joint controls the wrist rotation
-        self.robot.q = q_flipped
-        
-        # 5. Lower the patty back
-        self.robot.q = q_grip_patty
+        # 2. Flip patty
+        flip_loc = offset_location * SE3.Rx(pi) 
+        q2 = self.robot.ikine_LM(flip_loc,joint_limits=True)  # This should be a position above the patty
+        if q2.success:
+            qtraj = rtb.jtraj(q1.q, q2.q,50).q
+            full_qlist.append(qtraj)
 
-        # 6. Return to initial pose or suitable rest pose
-        self.robot.q = q_above_patty
+    
+        # # 3. Lift it slightly
+        # self.robot.q = q_above_patty
+        
+        # # 4. Rotate the wrist (or suitable joint) to flip
+        # q_flipped = q_above_patty.copy()
+        # q_flipped[-2] += 3.14  # Assuming the second last joint controls the wrist rotation
+        # self.robot.q = q_flipped
+        
+        # # 5. Lower the patty back
+        # self.robot.q = q_grip_patty
 
+        # # 6. Return to initial pose or suitable rest pose
+        # self.robot.q = q_above_patty
+
+
+        return full_qlist
     def move_to_plate(self):
         # 1. Move gripper above the patty
         q_above_patty = self.robot.ik(above_patty)
@@ -259,4 +327,5 @@ if __name__ == "__main__":
     # env = swift.Swift()
     # env.launch(realtime= True)
     r = CookingRobot()
-    r.MotionTest()
+    # r.MotionTest()
+    r.PattyFlipTest()
