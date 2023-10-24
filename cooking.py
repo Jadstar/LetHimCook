@@ -19,11 +19,21 @@ above_plate = (0,2,0.5)
 
 
 class CookingRobot:
+    '''
+    This class combines the components that will make up the Fetch Robot Including:
+
+    Fetch Robot - The Robotic Arm
+    Fetch Camera - For sensing
+    Spatula Mount - To mount the Spatula to the Robot
+    Spatula - To Flip the Burgers
+
+    '''
     def __init__(self, env):
         self.env = env
-        self.robot = rtb.models.Fetch()
-        self.patty = self.env.load_stl("BurgerPatty.stl")
-        self.plate = self.env.load_stl("Choppingboard.stl")
+        self.robot = Fetch()
+        self.camera = FetchCamera()
+        self.spatula_mount = ''
+        self.spatula = ''
 
         # Initialization
         self.patty_temp = ROOM_TEMP
