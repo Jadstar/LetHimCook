@@ -4,15 +4,20 @@ THIS IS WHERE THE TESTING AND USAGE OF THE FETCH ROBOT FLIPPING BURGERS WILL BE 
 '''
 import swift
 import roboticstoolbox as rtb
+from fetch_robot import Fetch
 
 ROOM_TEMP = 20  # in Celsius
 FLIP_TEMP = 70  # temperature to flip the patty
 DONE_TEMP = 90  # temperature the patty is fully cooked
 TIME_STEP = 0.02  # simulation time step
+
+
 patty_position = (0,1,0)
 above_patty = (0,1,.5)
 plate_position = (0,2,0)
 above_plate = (0,2,0.5)
+
+
 class CookingRobot:
     def __init__(self, env):
         self.env = env
@@ -25,7 +30,17 @@ class CookingRobot:
         self.patty_flipped = False
         self.patty_is_cooked = False
 
-    def flip_patty(self):
+
+
+    def locatePatty(self,patty):
+        '''
+        Finds the pose of the patty to be locked into the flip
+        '''
+
+
+
+
+    def flip_patty(self, location):
         # 1. Move gripper above the patty
         q_above_patty = self.robot.ik(above_patty)  # This should be a position above the patty
         self.robot.q = q_above_patty

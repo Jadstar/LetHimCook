@@ -1,169 +1,114 @@
+#!/usr/bin/env python
 import swift
-import roboticstoolbox as rtb
-from spatialmath.base import *
-import spatialmath.base as spb
-from spatialmath import SE3
-from ir_support.robots.DHRobot3D import DHRobot3D
-import time
-import os
-# Useful variables
-from math import pi
-import scipy.spatial
 import numpy as np
-import matplotlib.pyplot as plt
+from roboticstoolbox.robot.Robot import Robot
+import roboticstoolbox as rtb
+from math import pi
+# from spatialmath import SE3
 
 
+class Fetch(Robot):
+    """
+    Heavily taken from Robotics Toolbox for Python
+    https://petercorke.github.io/robotics-toolbox-python/arm_erobot.html#defined-from-urdf
 
+    As could not figure out how to define DH params, use ETS to define robot
+    plus  URDF allows for ROS integration 
 
-class FetchRobot(DHRobot3D):
-    '''
-    Used to Incorporate UR3 onto existing Linear Rails
-    '''
-    
+    ERobot: fetch (by Fetch), 10 joints (RPPRRRRRRR), 1 gripper, 6 branches, dynamics, geometry, collision
+    ┌─────┬────────────────────┬───────┬────────────────────┬─────────────────────────────────────────────────────────┐
+    │link │        link        │ joint │       parent       │                   ETS: parent to link                   │
+    ├─────┼────────────────────┼───────┼────────────────────┼─────────────────────────────────────────────────────────┤
+    │   0 │ base0              │       │ BASE               │ SE3()                                                   │
+    │   1 │ base1              │     0 │ base0              │ SE3() ⊕ Rz(q0)                                          │
+    │   2 │ base_link          │     1 │ base1              │ SE3() ⊕ tx(q1)                                          │
+    │   3 │ torso_lift_link    │     2 │ base_link          │ SE3(-0.08687, 0, 0.3774; -3.508e-15°, -0°, 0°) ⊕ tz(q2) │
+    │   4 │ shoulder_pan_link  │     3 │ torso_lift_link    │ SE3(0.1195, 0, 0.3486) ⊕ Rz(q3)                         │
+    │   5 │ shoulder_lift_link │     4 │ shoulder_pan_link  │ SE3(0.117, 0, 0.06) ⊕ Ry(q4)                            │
+    │   6 │ upperarm_roll_link │     5 │ shoulder_lift_link │ SE3(0.219, 0, 0) ⊕ Rx(q5)                               │
+    │   7 │ elbow_flex_link    │     6 │ upperarm_roll_link │ SE3(0.133, 0, 0) ⊕ Ry(q6)                               │
+    │   8 │ forearm_roll_link  │     7 │ elbow_flex_link    │ SE3(0.197, 0, 0) ⊕ Rx(q7)                               │
+    │   9 │ wrist_flex_link    │     8 │ forearm_roll_link  │ SE3(0.1245, 0, 0) ⊕ Ry(q8)                              │
+    │  10 │ @wrist_roll_link   │     9 │ wrist_flex_link    │ SE3(0.1385, 0, 0) ⊕ Rx(q9)                              │
+    │  11 │ bellows_link       │       │ torso_lift_link    │ SE3()                                                   │
+    │  12 │ bellows_link2      │       │ torso_lift_link    │ SE3()                                                   │
+    │  13 │ estop_link         │       │ base_link          │ SE3(-0.1246, 0.2389, 0.3113; 90°, -0°, 0°)              │
+    │  14 │ laser_link         │       │ base_link          │ SE3(0.235, 0, 0.2878; -180°, -0°, 0°)                   │
+    │  15 │ torso_fixed_link   │       │ base_link          │ SE3(-0.08687, 0, 0.3774; -3.508e-15°, -0°, 0°)          │
+    └─────┴────────────────────┴───────┴────────────────────┴─────────────────────────────────────────────────────────┘
+
+    qr = arm aligned in x axis
+    qz = arm tucked in 
+    ┌─────┬─────┬────┬───────┬────────┬────────┬────────┬────────┬─────┬────────┬─────┐
+    │name │ q0  │ q1 │ q2    │ q3     │ q4     │ q5     │ q6     │ q7  │ q8     │ q9  │
+    ├─────┼─────┼────┼───────┼────────┼────────┼────────┼────────┼─────┼────────┼─────┤
+    │  qr │  0° │  0 │  0.05 │  75.6° │  80.2° │ -11.5° │  98.5° │  0° │  95.1° │  0° │
+    │  qz │  0° │  0 │  0    │  0°    │  0°    │  0°    │  0°    │  0° │  0°    │  0° │
+
+    """
+
     def __init__(self):
-        self.link3D_names = dict(link0 = 'fetch_meshes/robotbase', color0 = (0.8,0.8,0.8,1),      # color option only takes effect for stl file
-                            link1 = 'fetch_meshes/shoulder_pan_link', color1 = (0.8,0.8,0.8,1),
-                            link2 = 'fetch_meshes/shoulder_lift_link', color2 = (0.8,0.8,0.8,1),
-                            link3 = 'fetch_meshes/upperarm_roll_link', color3 = (0.8,0.8,0.8,1),
-                            link4 = 'fetch_meshes/elbow_flex_link', color4 = (0.8,0.8,0.8,1),
-                            link5 = 'fetch_meshes/forearm_roll_link', color5 = (0.8,0.8,0.8,1),
-                            link6 = 'fetch_meshes/wrist_flex_link',color6 = (0.8,0.8,0.8,1),
-                            link7 = 'fetch_meshes/joinedgripper',color7 = (0.8,0.8,0.8,1),
-                            link8 = 'fetch_meshes/gripper_finger',color8 = (0.8,0.8,0.8,1),
-                            link9 = 'fetch_meshes/gripper_finger',color9= (0.8,0.8,0.8,1)
-                            )
-     
-        self.loadModel()
-    
-    def DHParams(self):
-        '''
-        TODO: Find the appropriate DH Params for the Fetch Robot 
-        '''
-        links = []    # Prismatic Link
-        # print (links[0])
-       # Combined DH parameters
-        d = [ 0.065, 0.218, 0.082, 0.196, 0.122, 0.31, 0, 0,0]
-        a = [0.12, 0, 0, 0, 0, 0, 0, 0,0]
-        alpha = [-pi/2,0,pi/2,-pi/2,0,pi/2,-pi/2,0,pi]
-        # offset = [0,0,pi/2,0,pi/2,0,pi/2,0,0]
-        qlim = [[-pi, pi] for _ in range(9)]
-        for i in range(9):
-            link = rtb.RevoluteDH(d=d[i], a=a[i], alpha=alpha[i], qlim= qlim[i])
-            links.append(link)
 
-        # links = [rtb.PrismaticDH(theta= 0, a= 0, alpha= 0, qlim= [-0.05, 0]),
-        #          rtb.PrismaticDH(theta= 0, a= 0, alpha=0, qlim= [0, 0.05])]  
-    
-        return links
-    
+        links, name, urdf_string, urdf_filepath = self.URDF_read(tld="",file_path="fetch_robotdata/robots/fetch.urdf")
 
-    def loadModel(self):
-        '''
-        Loads model into Swift simulation
-        based off ir_support/robots:
-            - LinearUR5
-            - UR3
-
-        UPDATES:
-
-        Attempt 4: 16/10/2023
-        Jared: Cannot figure it out and finds the fetch robot in roboticstoolbox. AWESOME :(
-
-        Attempt 3: 15/10/23:
-        Jaden: When setting the DH models it seems that the origin 'q' will always stay at origin, so changing transformation to account for that. 
-
-        Attempt 2: 14/10/23:
-        Jaden: Attempted to do make base prismatic link,however would need an additional 'base' .dae model
-        Its possible but may keep it simple for now considering there is no need for it
-
-        Attempt 1: 13/10/23
-        Jaden/Jared: Models transformed in swift env however DH params not set
-        '''
-                # A joint config and the 3D object transforms to match that config
-        qtest = [0,0,0,0,0,0,0,0,0]
-
-        qtest_transforms = [ spb.transl(-0.12, 0,-0.6775), # Base
-                            spb.transl(0, 0,0) , # Shoulder Pan Link
-                            spb.transl(0.12, 0,0.065) , # Shoulder Lift Link
-                            spb.transl(0.338,0,0.065) ,  # Upperarm Roll
-                            spb.transl(0.47,0, 0.065)  , # Elbow Flex
-                            spb.transl(0.666, 0,0.065),# Forearm Roll
-                            spb.transl(0.792, 0,0.065) ,   # Wrist Flex
-                            spb.transl(0.933, 0,0.065)  ,# Wrist Roll + Gripper
-                            spb.transl(1.168, 0.04,0.0645)  , #L Gripper Finger
-                            spb.transl(1.168, -0.04,0.0645), #R Gripper Finger
-                            ] 
-        current_path = os.path.abspath(os.path.dirname(__file__))
-        links= self.DHParams()
-        print(len(links))
-        super().__init__(links, self.link3D_names, name = 'Fetch_Robot', link3d_dir = current_path, qtest = qtest, qtest_transforms = qtest_transforms)
-        # self.base = self.base * SE3.Rx(pi/2) * SE3.Ry(pi/2)
-
-        # Shifting Model up so appears to sit on plane
-        self.base = self.base * SE3(0.12,0,0.6675)
-        self.q = qtest
-    
-    def test2(self):
-        """
-        Test the class by adding 3d objects into a new Swift window and do a simple movement
-        """
-        env = swift.Swift()
-        env.launch(realtime= True)
-        # self.add_to_env(env)
-        fetch = rtb.models.Fetch()
-        print(fetch.q)
-        # Add the robot to the simulator
-        env.add(fetch)
-
-        q_goal = [fetch.q[i]-pi/3 for i in range(len(fetch.q))]
-        # q_goal[0] = self.q[0]
-        # q_goal[0] = -1 # Move the rail link
-        qtraj = rtb.jtraj(fetch.q, q_goal, 50).q
-
-
-        fig = self.plot(self.q, limits= [-1,1,-1,1,-1,1])
-        fig._add_teach_panel(self, self.q)
-
-        # env.hold()
-        for q in qtraj:
-            fetch.q = q
-            env.step(0.02)
-            fig.step(0.01)
-            # time.sleep(1)
-        fig.hold()
-        env.hold()
-        # time.sleep(3)    
-    def test(self):
-        """
-        Test the class by adding 3d objects into a new Swift window and do a simple movement
-        """
-        env = swift.Swift()
-        env.launch(realtime= True)
-        self.add_to_env(env)
+        super().__init__(
+            links,
+            name=name,
+            manufacturer="Fetch",
+            gripper_links=links[11],
+            urdf_string=urdf_string,
+            urdf_filepath=urdf_filepath,
+        )
+        self.qdlim = np.array([4.0, 4.0, 0.1, 1.25, 1.45, 1.57, 1.52, 1.57, 2.26, 2.26])
         
-        q_goal = [self.q[i]-pi/3 for i in range(self.n)]
-        # q_goal[0] = self.q[0]
-        # q_goal[0] = -1 # Move the rail link
-        qtraj = rtb.jtraj(self.q, q_goal, 50).q
+
+        self.qz = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
+        self.qr = np.array([0, 0, 0.05, 1.32, 1.4, -0.2, 1.72, 0, 1.66, 0])
+
+        self.addconfiguration("qr", self.qr)
+        self.addconfiguration("qz", self.qz)
 
 
-        fig = self.plot(self.q, limits= [-1,1,-1,1,-1,1])
-        fig._add_teach_panel(self, self.q)
+if __name__ == "__main__":  # TESTING FETCH ROBOT
 
-        # env.hold()
-        for q in qtraj:
-            self.q = q
-            env.step(0.02)
-            fig.step(0.01)
-            # time.sleep(1)
-        fig.hold()
-        env.hold()
-        # time.sleep(3)    
+    env = swift.Swift()
+    env.launch(realtime= True)
 
-if __name__ == "__main__":  
-    r = FetchRobot()    
-    # r.test()    # The original
-    r.test2()   # NEW
+    robot = Fetch()
+    qtest = [0,0,0,0,0,0,0,0,0,0]
+
+    env.add(robot)
+    for link in robot.links:
+        print(link.name)
+        print(link.isjoint)
+        print(len(link.collision))
+
+    print()
+
+    for link in robot.grippers[0].links:
+        print(link.name)
+        print(link.isjoint)
+        print(len(link.collision))
+
+    # robot.plot(robot.q)
+    print(robot.qz)
+    print(robot.qr)
+    tr = robot.fkine(qtest)
+    tz = robot.fkine(robot.qz)
+    print(robot.qlim)
 
 
-    
+    # Tep = robot.fkine([0, -0.3, 0, -2.2, 0, 2, 0.7854,0,0,0]).A
+    q_goal = [robot.q[i]-pi/3 for i in range(len(robot.q))]
+
+    finalpos = robot.ikine_LM(tz,q0=robot.qr,joint_limits=True)
+    print(finalpos)
+    if finalpos.success:
+        qgoal = finalpos.q
+        qtraj = rtb.jtraj(robot.q,qgoal,50,).q
+
+    for q in qtraj:
+        robot.q = q
+        env.step(0.02)
+
+    env.hold()
