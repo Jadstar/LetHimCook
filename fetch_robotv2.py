@@ -3,7 +3,7 @@ import swift
 import numpy as np
 from roboticstoolbox.robot.Robot import Robot
 import roboticstoolbox as rtb
-
+from math import pi
 # from spatialmath import SE3
 
 
@@ -59,8 +59,8 @@ class Fetch(Robot):
             urdf_string=urdf_string,
             urdf_filepath=urdf_filepath,
         )
-
         self.qdlim = np.array([4.0, 4.0, 0.1, 1.25, 1.45, 1.57, 1.52, 1.57, 2.26, 2.26])
+        
 
         self.qz = np.array([0, 0, 0, 0, 0, 0, 0, 0, 0, 0])
         self.qr = np.array([0, 0, 0.05, 1.32, 1.4, -0.2, 1.72, 0, 1.66, 0])
@@ -75,7 +75,8 @@ if __name__ == "__main__":  # pragma nocover
     env.launch(realtime= True)
 
     robot = Fetch()
-    print(robot.q)
+    qtest = [0,0,0,0,0,0,0,0,0,0]
+
     env.add(robot)
     for link in robot.links:
         print(link.name)
@@ -90,17 +91,24 @@ if __name__ == "__main__":  # pragma nocover
         print(len(link.collision))
 
     # robot.plot(robot.q)
-    # print(robot.qz)
-    # tr = robot.fkine(robot.qr).A
-    # print(tr)
-    # finalpos = robot.ikine_LM(robot.fkine(robot.qr).A,q0=robot.qr,joint_limits=True)
+    print(robot.qz)
+    print(robot.qr)
+    tr = robot.fkine(qtest)
+    tz = robot.fkine(robot.qz)
+    print(robot.qlim)
 
-    # if finalpos.success:
-    #     qgoal = finalpos.q
-    #     qtraj = rtb.jtraj(robot.q,qgoal,50,).q
 
-    # for q in qtraj:
-    #     robot.q = q
-    #     env.step(0.02)
+    # Tep = robot.fkine([0, -0.3, 0, -2.2, 0, 2, 0.7854,0,0,0]).A
+    q_goal = [robot.q[i]-pi/3 for i in range(len(robot.q))]
+
+    finalpos = robot.ikine_LM(tz,q0=robot.qr,joint_limits=True)
+    print(finalpos)
+    if finalpos.success:
+        qgoal = finalpos.q
+        qtraj = rtb.jtraj(robot.q,qgoal,50,).q
+
+    for q in qtraj:
+        robot.q = q
+        env.step(0.02)
 
     env.hold()

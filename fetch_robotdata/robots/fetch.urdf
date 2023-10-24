@@ -32,14 +32,14 @@
     <parent link="base0"/>
     <child link="base1"/>
     <axis xyz="0 0 1"/>
-    <limit effort="87" lower="-999999" upper="999999" velocity="4.0"/>
+    <limit effort="87" lower="-10" upper="10" velocity="4.0"/>
   </joint>
   <joint name="base_joint2" type="prismatic">
     <origin rpy="0 0 0" xyz="0 0 0"/>
     <parent link="base1"/>
     <child link="base_link"/>
     <axis xyz="1 0 0"/>
-    <limit effort="87" lower="-999999" upper="999999" velocity="4.0"/>
+    <limit effort="87" lower="-10" upper="10" velocity="4.0"/>
   </joint>
 	
 
@@ -164,7 +164,7 @@
     <child link="upperarm_roll_link" />
     <axis xyz="1 0 0" />
     <dynamics damping="5.0" />
-    <limit effort="76.94" velocity="1.571" />
+    <limit effort="76.94" lower="-1.5707" upper="1.5707" velocity="1.571" />
   </joint>
 
   <link name="elbow_flex_link">
@@ -226,7 +226,7 @@
     <child link="forearm_roll_link" />
     <axis xyz="1 0 0" />
     <dynamics damping="5.0" />
-    <limit effort="29.35" velocity="1.571" />
+    <limit effort="29.35" lower="-1.5707" upper="1.5707" velocity="1.571" />
   </joint>
 
   <link name="wrist_flex_link">
@@ -287,7 +287,7 @@
     <parent link="wrist_flex_link" />
     <child link="wrist_roll_link" />
     <axis xyz="1 0 0" />
-    <limit effort="7.36" velocity="2.268" />
+    <limit effort="7.36" lower="-1.5707" upper="1.5707" velocity="2.268" />
     <dynamics damping="5.0" />
   </joint>
 
