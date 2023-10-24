@@ -5,6 +5,9 @@ THIS IS WHERE THE TESTING AND USAGE OF THE FETCH ROBOT FLIPPING BURGERS WILL BE 
 import swift
 import roboticstoolbox as rtb
 from fetch_robot import Fetch
+from FetchCam import FetchCamera
+from spatialmath import SE3
+
 
 ROOM_TEMP = 20  # in Celsius
 FLIP_TEMP = 70  # temperature to flip the patty
@@ -40,7 +43,17 @@ class CookingRobot:
         self.patty_flipped = False
         self.patty_is_cooked = False
 
-
+    def CookRobotMove(self,coords,rot_angle,axis):
+        '''
+        Very Similar to how SE3 works but makes sure that everything moves with each other
+        (i.e. arm, camera and spatula all move together)
+        '''
+        if coords is not None:
+            self.robot.base = SE3(coords)
+            self.camera = SE3(coords)
+            self.spatula = SE3(coords)
+            self.spatula_mount = SE3(coords)
+        
 
     def locatePatty(self,patty):
         '''
