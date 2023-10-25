@@ -11,7 +11,6 @@ import os
 import spatialgeometry as geometry
 import numpy as np
 from math import pi
-
 ROOM_TEMP = 20  # in Celsius
 FLIP_TEMP = 70  # temperature to flip the patty
 DONE_TEMP = 90  # temperature the patty is fully cooked
@@ -135,6 +134,7 @@ class CookingRobot:
         self.mount_offset = SE3(-0.085,0,0)
         #The offset to make sure the end effector is the spatula, not gripper
         self.patty_offset = SE3(-0.13,0,0.065)
+        self.flipoffset = SE3(0.13,0,-0.05)    #So when flipping, the patty stays on the spatula
 
         spatula_pose = self.robot.fkine(self.robot.q).A * SE3.Rz(pi/2) * self.spatula_offset
         spatula_mount_pose = self.robot.fkine(self.robot.q).A * self.mount_offset
@@ -160,7 +160,6 @@ class CookingRobot:
         '''
         Testing the robot flipping capabilities
         '''
-        pattyoffset = SE3(-0.13,0,0.065)    #To ensure the spatula is at the patty, not the gripper
         env = swift.Swift()
         env.launch(realtime= True)
         self.AddtoEnv(env)
@@ -171,22 +170,61 @@ class CookingRobot:
 
         goal_test = patty.getPose()
 
-        #Flip Patty Function
-        fullq = self.flip_patty(goal_test)
+        #Flip Patty Function (first part of list is moving towards patty, next part is flipping)
+        fullq = self.flip_patty(patty)
         # patty_offset = goal_test *pattyoffset 
 
         # q_goal = self.robot.ikine_LM(patty_offset,joint_limits=True).q
         # # q_goal = [-pi/3, -pi/3,  -pi/3,  0 , 0,  0, -1.06027914,  1.42696591,  1.70241279, -0.68058669]
         # qtraj = rtb.jtraj(self.robot.q, q_goal,50).q
 
-        for qtraj in fullq:
-            for q in qtraj:
-                self.CookMove(q)
-                # tr = self.robot.fkine(q).A
-                # patty.setPose(tr * self.patty_offset)
-                env.step(0.02)
+        for q in fullq[0]:
+            self.CookMove(q)
+            # tr = self.robot.fkine(q).A
+            # patty.setPose(tr * self.patty_offset)
+            env.step(0.02)
+            
+        # Flipping Patty
+        for q in fullq[1]:
+            self.CookMove(q)
+            tr = self.robot.fkine(q).A
+            patty.setPose(tr * self.flipoffset)
+            env.step(0.02)
+        #Gravity
+        for s in self.PattyGravity(patty):
+            patty.setPose(s)
+            env.step(0.02)
+
         env.hold()
 
+    def PattyGravity(self,patty : type(Patty)):
+        '''
+        To simulate the patties falling back onto the grill, we use this fuction to move the patty slightly down to its original position after it was flipped
+        Outputs a list of values to be used in env to fall down
+        '''
+        steps = 10
+        currpose = patty.getPose()
+        offset_z = self.flipoffset.A[2, 3]  # Assuming Z value is at row 2, column 2
+        print(offset_z)
+        # Create finalpose by copying all data from currpose
+        finalpose = currpose.copy()
+
+        # Modify the Z value in finalpose
+        finalpose[2, 3] = currpose[2, 3] + offset_z
+
+        print(currpose)
+        print(finalpose)
+        interpolated_poses=[]
+        for i in range(steps):
+            t = i / (steps - 1)  # Linear interpolation parameter
+
+            # Create an interpolated pose by linearly interpolating the Z value
+            interpolated_pose = currpose.copy()
+            interpolated_pose[2, 3] = (1 - t) * currpose[2, 3] + t * finalpose[2, 3]
+
+            interpolated_poses.append(interpolated_pose)
+
+        return interpolated_poses
     def MotionTest(self):
         '''
         Testing the motion of components together
@@ -244,24 +282,33 @@ class CookingRobot:
         return pattycoords
 
 
-    def flip_patty(self, location):
+    def flip_patty(self, patty : type(Patty)):
         '''
         Creates a big list of joint values that move the spatula to the patty, and flip it over
         '''
         full_qlist = []
+        location = patty.getPose()
+        print(location)
         offset_location = location * self.patty_offset #Offset for the spatula to be in correct position to patty
         
 
         # 1. Move gripper above the patty
-        q1 = self.robot.ikine_LM(offset_location,joint_limits=True)  # This should be a position above the patty
+        q0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
+        q1 = self.robot.ikine_LM(offset_location,q0=q0, joint_limits=True)  # This should be a position above the patty
         if q1.success:
+            print(q1.q)
             qtraj = rtb.jtraj(self.robot.q, q1.q,50).q
             full_qlist.append(qtraj)
         
-        # 2. Flip patty
+        # 2. Flip patty, use q1 pose as initial value for ikine
         flip_loc = offset_location * SE3.Rx(pi) 
-        q2 = self.robot.ikine_LM(flip_loc,joint_limits=True)  # This should be a position above the patty
+        
+        #It is ideal to reduce robot movement to prevent collsions, so x,y values with be masked in ikine and replaced with the q1 cartesian values
+        q2 = self.robot.ikine_LM(flip_loc,q0=q1.q,joint_limits=True,mask=[0,0,1,1,1,1])  # This should be a position above the patty
+        q2.q[:2] = q1.q[:2]
         if q2.success:
+            print(q2.q)
             qtraj = rtb.jtraj(q1.q, q2.q,50).q
             full_qlist.append(qtraj)
 
