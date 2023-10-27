@@ -351,20 +351,20 @@ class CookingRobot:
         # 5. Return to initial pose or suitable rest pose
         self.robot.q = q_above_plate
 
-    def cook(self):
+    def cook(self, patty):
         while not self.patty_is_cooked:
             # Simulate cooking
-            self.patty.heat(0.5)  # This updates the patty's temperature and color
+            patty.heat(0.5)  # This updates the patty's temperature and color
 
             # Check if it's time to flip the patty
-            if self.patty.temperature >= FLIP_TEMP and not self.patty_flipped:
+            if patty.temperature >= FLIP_TEMP and not self.patty_flipped:
                 self.flip_patty()
                 self.patty_flipped = True
 
             # Check if patty is cooked
             if self.patty_flipped and self.patty.temperature >= DONE_TEMP:
                 self.move_to_plate()
-                self.patty_is_cooked = True
+                patty_is_cooked = True
 
             self.env.step(TIME_STEP)
 
