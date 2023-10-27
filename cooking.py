@@ -330,6 +330,9 @@ class CookingRobot:
 
         return full_qlist
     def move_to_plate(self):
+        '''
+        TODO: Fix this function 
+        '''
         # 1. Move gripper above the patty
         q_above_patty = self.robot.ik(above_patty)
         self.robot.q = q_above_patty
