@@ -148,6 +148,22 @@ class CookingRobot:
         # Initialization
         self.patty_flipped = False
         self.patty_is_cooked = False
+    
+    def getPose(self):
+        return self.robot.base
+    def setPose(self,position):
+        '''
+        Sets the position of patty, useful when it needs to be moved
+
+        Position must be in SE3 format
+        '''
+        self.robot.base = position
+        self.camera.base = position
+        tr = self.robot.fkine(self.robot.q).A
+   
+        self.spatula.T = tr *  SE3.Rz(pi/2) * self.spatula_offset
+        self.spatula_mount._T = tr * self.mount_offset
+        self.camera.q[:3] = self.robot.q[:3]            # FetchCamera only has 5 links so only uses that are necesary
 
     def AddtoEnv(self,env):
         env.add(self.robot)
@@ -177,6 +193,7 @@ class CookingRobot:
         # q_goal = self.robot.ikine_LM(patty_offset,joint_limits=True).q
         # # q_goal = [-pi/3, -pi/3,  -pi/3,  0 , 0,  0, -1.06027914,  1.42696591,  1.70241279, -0.68058669]
         # qtraj = rtb.jtraj(self.robot.q, q_goal,50).q
+
 
         for q in fullq[0]:
             self.CookMove(q)
@@ -225,6 +242,19 @@ class CookingRobot:
             interpolated_poses.append(interpolated_pose)
 
         return interpolated_poses
+    
+    def moveToPos(self,position):
+        '''
+        Used to move the fetch robot around place. 
+        Input: SE3 coordinates
+        Returns a list of jtraj() values to be used in main
+        '''
+        q_goal = self.robot.ikine_LM(position,q0=self.robot.q,joint_limits=True,mask=[1,0,0,0,0,0])
+
+        if q_goal.success:
+            print(q_goal.q)
+            qtraj = rtb.jtraj(self.robot.q, q_goal.q,50).q
+        return qtraj
     def MotionTest(self):
         '''
         Testing the motion of components together
@@ -264,7 +294,7 @@ class CookingRobot:
         tr = self.robot.fkine(self.robot.q).A
         #moving Gripper as well
         # print(tr)
-        # print(q)
+        print(q)
         self.spatula.T = tr *  SE3.Rz(pi/2) * self.spatula_offset
         self.spatula_mount._T = tr * self.mount_offset
         self.camera.q[:3] = self.robot.q[:3]            # FetchCamera only has 5 links so only uses that are necesary
@@ -288,46 +318,41 @@ class CookingRobot:
         '''
         full_qlist = []
         location = patty.getPose()
-        print(location)
-        offset_location = location * self.patty_offset #Offset for the spatula to be in correct position to patty
+        offset_location = location  * self.patty_offset #Offset for the spatula to be in correct position to patty
+        print(offset_location)
         
 
         # 1. Move gripper above the patty
+        initalq = self.robot.q
+        initalq[1] = np.linalg.norm(location[0,3]+ location[1,3])
+        # print(f'initial q: {initalq}')
+
         q0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
-        q1 = self.robot.ikine_LM(offset_location,q0=q0, joint_limits=True)  # This should be a position above the patty
+        q1 = self.robot.ikine_LM(offset_location,q0=q0,joint_limits=True)  # This should be a position above the patty
         if q1.success:
             print(q1.q)
+            self.robot.q  
             qtraj = rtb.jtraj(self.robot.q, q1.q,50).q
+            print(self.robot.fkine(q1.q))
             full_qlist.append(qtraj)
+        # else:
+        #     print("q1 failed")
+
         
         # 2. Flip patty, use q1 pose as initial value for ikine
         flip_loc = offset_location * SE3.Rx(pi) 
         
         #It is ideal to reduce robot movement to prevent collsions, so x,y values with be masked in ikine and replaced with the q1 cartesian values
-        q2 = self.robot.ikine_LM(flip_loc,q0=q1.q,joint_limits=True,mask=[0,0,1,1,1,1])  # This should be a position above the patty
-        q2.q[:2] = q1.q[:2]
-        if q2.success:
-            print(q2.q)
-            qtraj = rtb.jtraj(q1.q, q2.q,50).q
-            full_qlist.append(qtraj)
-
+        # q2 = self.robot.ikine_LM(flip_loc,q0=q1.q,joint_limits=True,mask=[0,0,1,1,1,1],ilimit=1000,slimit=200)  # This should be a position above the patty
+        # q2.q[:2] = q1.q[:2]
+        # if q2.success:
+        #     print(q2.q)
+        #     qtraj = rtb.jtraj(q1.q, q2.q,50).q
+        #     full_qlist.append(qtraj)
+        # else:
+        #     print("q2 failed")
     
-        # # 3. Lift it slightly
-        # self.robot.q = q_above_patty
-        
-        # # 4. Rotate the wrist (or suitable joint) to flip
-        # q_flipped = q_above_patty.copy()
-        # q_flipped[-2] += 3.14  # Assuming the second last joint controls the wrist rotation
-        # self.robot.q = q_flipped
-        
-        # # 5. Lower the patty back
-        # self.robot.q = q_grip_patty
-
-        # # 6. Return to initial pose or suitable rest pose
-        # self.robot.q = q_above_patty
-
-
+        print
         return full_qlist
     def move_to_plate(self):
         '''
