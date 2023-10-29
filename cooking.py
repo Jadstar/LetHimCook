@@ -311,6 +311,9 @@ class CookingRobot:
 
         return pattycoords
 
+    def calculate_distance(self, robot, q, offset_location):
+        calculated_position = robot.fkine(q).A[:3, 3]
+        return np.linalg.norm(calculated_position - np.array([offset_location[0, 3], offset_location[1, 3], offset_location[2, 3]]))
 
     def flip_patty(self, patty : type(Patty)):
         '''
@@ -327,9 +330,27 @@ class CookingRobot:
         print(f"Patty Location: x={offset_location[0, 3]}, y={offset_location[1, 3]}, z={offset_location[2, 3]}")
         print(f"Initial Location: {self.robot.fkine(self.robot.q).A[:3, 3]}")
 
-        # 2. Move to Patty
-        q0 = self.robot.q  # Current configuration
-        q1 = self.robot.ikine_LM(offset_location, ilimit=100, slimit=10000)
+        q0 = [0,0,0,0,0,0,0,0,0,0]
+        q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
+        max_attempts = 1000  # Maximum number of attempts to find a valid IK solution.
+        attempts = 0
+        mindist = 10000
+        while attempts < max_attempts:
+            q1 = self.robot.ikine_LM(offset_location,q0=q0, ilimit=200, slimit=10000, joint_limits=False)
+            
+            print("===================")
+            print(f"tried Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
+            print('===but distance===')
+            print(self.calculate_distance(self.robot, q1.q, offset_location))
+            print(q1.q)
+            
+            if mindist > self.calculate_distance(self.robot, q1.q, offset_location):
+                q0=q1.q
+                mindist = self.calculate_distance(self.robot, q1.q, offset_location)
+            if q1.success and self.calculate_distance(self.robot, q1.q, offset_location) <= 0.1:
+                break
+            attempts += 1
+        print(q1.q)
         if q1.success:
             qtraj_to_patty = rtb.jtraj(self.robot.q, q1.q, 50).q
             full_qlist.append(qtraj_to_patty)
@@ -337,7 +358,7 @@ class CookingRobot:
 
         # 3. Flip Patty
         flip_loc = offset_location * SE3.Rx(pi)
-        q2 = self.robot.ikine_LM(flip_loc, q0=q1.q, joint_limits=True, mask=[0,0,1,1,1,1])
+        q2 = self.robot.ikine_LM(flip_loc, q0=q0, joint_limits=True, mask=[0,0,1,1,1,1])
         if q2.success:
             qtraj_flip = rtb.jtraj(q1.q, q2.q, 50).q
             full_qlist.append(qtraj_flip)
@@ -396,9 +417,9 @@ class CookingRobot:
 
 
 
-# if __name__ == "__main__":
-    # env = swift.Swift()
-    # env.launch(realtime= True)
-    # r = CookingRobot()
+if __name__ == "__main__":
+    env = swift.Swift()
+    env.launch(realtime= True)
+    r = CookingRobot()
     # r.MotionTest()
-    # r.PattyFlipTest()
+    r.PattyFlipTest()

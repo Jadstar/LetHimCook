@@ -144,7 +144,7 @@ def main():
     print('configged enviro')
     # Load the robot and cooking items
     robot = CookingRobot()
-    robot.setPose(SE3(0,11.5,FLOOR_LVL) *SE3.Rz(-pi/2))
+    robot.setPose(SE3(0,11.5,FLOOR_LVL) )
     robot.robot.q = robot.robot.qr  # Update the robot's internal state to reflect its current pose
     print("++++++++++++++++++")
     print(robot.robot.fkine(robot.robot.qr).A[:3, 3])
