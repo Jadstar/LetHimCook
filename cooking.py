@@ -23,7 +23,7 @@ above_plate = (0,2,0.5)
 
 
 class Patty:
-    def __init__(self, position=SE3(0,0,0),env=None):
+    def __init__(self, position,env=None):
         '''
         Initializes the Patty in the simulation environment.
         
