@@ -15,13 +15,7 @@ ROOM_TEMP = 20  # in Celsius
 FLIP_TEMP = 70  # temperature to flip the patty
 DONE_TEMP = 90  # temperature the patty is fully cooked
 TIME_STEP = 0.02  # simulation time step
-
-patty_position = (0,1,0)
-above_patty = (0,1,.5)
-plate_position = (0,2,0)
-above_plate = (0,2,0.5)
-
-
+import time
 class Patty:
     def __init__(self, position=SE3(0,0,0),env=None):
         '''
@@ -148,6 +142,22 @@ class CookingRobot:
         # Initialization
         self.patty_flipped = False
         self.patty_is_cooked = False
+    
+    def getPose(self):
+        return self.robot.base
+    def setPose(self,position):
+        '''
+        Sets the position of patty, useful when it needs to be moved
+
+        Position must be in SE3 format
+        '''
+        self.robot.base = position
+        self.camera.base = position
+        tr = self.robot.fkine(self.robot.q).A
+        
+        self.spatula.T = tr *  SE3.Rz(pi/2) * self.spatula_offset
+        self.spatula_mount._T = tr * self.mount_offset
+        self.camera.q[:3] = self.robot.q[:3]            # FetchCamera only has 5 links so only uses that are necesary
 
     def AddtoEnv(self,env):
         env.add(self.robot)
@@ -177,6 +187,7 @@ class CookingRobot:
         # q_goal = self.robot.ikine_LM(patty_offset,joint_limits=True).q
         # # q_goal = [-pi/3, -pi/3,  -pi/3,  0 , 0,  0, -1.06027914,  1.42696591,  1.70241279, -0.68058669]
         # qtraj = rtb.jtraj(self.robot.q, q_goal,50).q
+
 
         for q in fullq[0]:
             self.CookMove(q)
@@ -225,6 +236,19 @@ class CookingRobot:
             interpolated_poses.append(interpolated_pose)
 
         return interpolated_poses
+    
+    def moveToPos(self,position):
+        '''
+        Used to move the fetch robot around place. 
+        Input: SE3 coordinates
+        Returns a list of jtraj() values to be used in main
+        '''
+        q_goal = self.robot.ikine_LM(position,q0=self.robot.q,joint_limits=True,mask=[1,0,0,0,0,0])
+
+        if q_goal.success:
+            print(q_goal.q)
+            qtraj = rtb.jtraj(self.robot.q, q_goal.q,50).q
+        return qtraj
     def MotionTest(self):
         '''
         Testing the motion of components together
@@ -245,30 +269,36 @@ class CookingRobot:
         env.hold()
 
 
-    def CookMove(self,q):
+    def CookMove(self, target_q):
         '''
-        Very Similar to how SE3 works but makes sure that everything moves with each other
-        (i.e. arm, camera and spatula all move together)
-
-        For some reason the prismatic torso lift is allowed to have a q value < 0 even though it has limit on it??
-        Specify that q[3] has to be always greater than 0 and less than limit to get correct end effector
+        Moves the robot instantly to the given joint configuration.
+        Ensures that the arm, camera, and spatula all move together.
+        Prints the initial and final positions.
         '''
-        self.robot.q = q 
-        if q[2] <0 or q[2] > 0.38615:
-            print("invalid q values")
-            if q[2] < 0 :
-                self.robot.q[2] = 0
-            else:
-                self.robot.q[2] = 0.38615
-                
-        tr = self.robot.fkine(self.robot.q).A
-        #moving Gripper as well
-        # print(tr)
-        # print(q)
-        self.spatula.T = tr *  SE3.Rz(pi/2) * self.spatula_offset
+        # Store the current joint configuration and compute its forward kinematics
+        initial_q = self.robot.q
+        initial_position = self.robot.fkine(initial_q).A[:3, 3]  # Extracting the translation part
+        print('cookmove RobotPos')
+        print(self.robot.fkine(initial_q).A[:3, 3])
+        # Adjust joint values for the prismatic torso lift
+        if target_q[2] < 0:
+            target_q[2] = 0
+        elif target_q[2] > 0.38615:
+            target_q[2] = 0.38615
+        
+        # Set the robot's joint values to the provided configuration
+        self.robot.q = target_q
+        final_position = self.robot.fkine(target_q).A[:3, 3]  # Extracting the translation part
+        
+        # Update the positions of the spatula, spatula mount, and camera
+        tr = self.robot.fkine(target_q).A
+        self.spatula.T = tr * SE3.Rz(pi/2) * self.spatula_offset
         self.spatula_mount._T = tr * self.mount_offset
-        self.camera.q[:3] = self.robot.q[:3]            # FetchCamera only has 5 links so only uses that are necesary
-    
+        self.camera.q[:3] = target_q[:3]  # Assuming the camera's joint values align with the robot's first 3 joints
+        
+        # Print the movement details
+        # print(f"Moved from joint configuration: {initial_q} to {target_q}")
+        print(f"End effector moved from position: {initial_position} to {final_position}")
 
     def locatePatties(self):
         '''
@@ -284,72 +314,68 @@ class CookingRobot:
 
     def flip_patty(self, patty : type(Patty)):
         '''
-        Creates a big list of joint values that move the spatula to the patty, and flip it over
+        Creates a list of joint values to move the spatula to the patty and flip it over.
+        This version also prints the global locations the robot will move between.
         '''
         full_qlist = []
+
+        # 1. Get Patty Location
         location = patty.getPose()
-        print(location)
-        offset_location = location * self.patty_offset #Offset for the spatula to be in correct position to patty
-        
+        print(f"Patty Location: x={location[0, 3]}, y={location[1, 3]}, z={location[2, 3]}")
 
-        # 1. Move gripper above the patty
-        q0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
-        q1 = self.robot.ikine_LM(offset_location,q0=q0, joint_limits=True)  # This should be a position above the patty
+        offset_location = location * self.patty_offset
+        print(f"Patty Location: x={offset_location[0, 3]}, y={offset_location[1, 3]}, z={offset_location[2, 3]}")
+        print(f"Initial Location: {self.robot.fkine(self.robot.q).A[:3, 3]}")
+
+        # 2. Move to Patty
+        q0 = self.robot.q  # Current configuration
+        q1 = self.robot.ikine_LM(offset_location, ilimit=100, slimit=10000)
         if q1.success:
-            print(q1.q)
-            qtraj = rtb.jtraj(self.robot.q, q1.q,50).q
-            full_qlist.append(qtraj)
-        
-        # 2. Flip patty, use q1 pose as initial value for ikine
-        flip_loc = offset_location * SE3.Rx(pi) 
-        
-        #It is ideal to reduce robot movement to prevent collsions, so x,y values with be masked in ikine and replaced with the q1 cartesian values
-        q2 = self.robot.ikine_LM(flip_loc,q0=q1.q,joint_limits=True,mask=[0,0,1,1,1,1])  # This should be a position above the patty
-        q2.q[:2] = q1.q[:2]
+            qtraj_to_patty = rtb.jtraj(self.robot.q, q1.q, 50).q
+            full_qlist.append(qtraj_to_patty)
+            print(f"Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
+
+        # 3. Flip Patty
+        flip_loc = offset_location * SE3.Rx(pi)
+        q2 = self.robot.ikine_LM(flip_loc, q0=q1.q, joint_limits=True, mask=[0,0,1,1,1,1])
         if q2.success:
-            print(q2.q)
-            qtraj = rtb.jtraj(q1.q, q2.q,50).q
-            full_qlist.append(qtraj)
+            qtraj_flip = rtb.jtraj(q1.q, q2.q, 50).q
+            full_qlist.append(qtraj_flip)
+            print(f"Flipping Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
 
-    
-        # # 3. Lift it slightly
-        # self.robot.q = q_above_patty
-        
-        # # 4. Rotate the wrist (or suitable joint) to flip
-        # q_flipped = q_above_patty.copy()
-        # q_flipped[-2] += 3.14  # Assuming the second last joint controls the wrist rotation
-        # self.robot.q = q_flipped
-        
-        # # 5. Lower the patty back
-        # self.robot.q = q_grip_patty
-
-        # # 6. Return to initial pose or suitable rest pose
-        # self.robot.q = q_above_patty
-
+        # 4. Return to Above Position
+        q3 = self.robot.ikine_LM(offset_location, q0=q2.q, joint_limits=True)
+        if q3.success:
+            qtraj_return = rtb.jtraj(q2.q, q3.q, 50).q
+            full_qlist.append(qtraj_return)
+            print(f"Returning Above Patty: {self.robot.fkine(q3.q).A[:3, 3]}")
 
         return full_qlist
-    def move_to_plate(self):
-        # 1. Move gripper above the patty
-        q_above_patty = self.robot.ik(above_patty)
-        self.robot.q = q_above_patty
+
+    # def move_to_plate(self):
+    #     '''
+    #     TODO: Fix this function 
+    #     '''
+    #     # 1. Move gripper above the patty
+    #     q_above_patty = self.robot.ik(above_patty)
+    #     self.robot.q = q_above_patty
         
-        # 2. Descend to grip the patty
-        q_grip_patty = self.robot.ik(patty_position)
-        self.robot.q = q_grip_patty
-        self.robot.gripper.close()
+    #     # 2. Descend to grip the patty
+    #     q_grip_patty = self.robot.ik(patty_position)
+    #     self.robot.q = q_grip_patty
+    #     self.robot.gripper.close()
         
-        # 3. Lift and navigate to above the plate
-        q_above_plate = self.robot.ik(plate_position)  # Above the plate
-        self.robot.q = q_above_plate
+    #     # 3. Lift and navigate to above the plate
+    #     q_above_plate = self.robot.ik(plate_position)  # Above the plate
+    #     self.robot.q = q_above_plate
         
-        # 4. Lower the patty onto the plate
-        q_on_plate = self.robot.ik(above_plate)  # Position on the plate
-        self.robot.q = q_on_plate
-        self.robot.gripper.open()
+    #     # 4. Lower the patty onto the plate
+    #     q_on_plate = self.robot.ik(above_plate)  # Position on the plate
+    #     self.robot.q = q_on_plate
+    #     self.robot.gripper.open()
         
-        # 5. Return to initial pose or suitable rest pose
-        self.robot.q = q_above_plate
+    #     # 5. Return to initial pose or suitable rest pose
+    #     self.robot.q = q_above_plate
 
     def cook(self, patty):
         while not self.patty_is_cooked:
@@ -364,15 +390,15 @@ class CookingRobot:
             # Check if patty is cooked
             if self.patty_flipped and self.patty.temperature >= DONE_TEMP:
                 self.move_to_plate()
-                patty_is_cooked = True
+                self.patty_is_cooked = True
 
             self.env.step(TIME_STEP)
 
 
 
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # env = swift.Swift()
     # env.launch(realtime= True)
-    r = CookingRobot()
+    # r = CookingRobot()
     # r.MotionTest()
-    r.PattyFlipTest()
+    # r.PattyFlipTest()
