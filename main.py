@@ -13,7 +13,7 @@ import roboticstoolbox as rtb
 #Determines how many patties will be on grill
 NUM_OF_PATTIES =12
 #Where the floor starts (z axis) on the swift env
-FLOOR_LVL = 0.2
+FLOOR_LVL = 0
 
 def testpatty(patty, window, env):
     
@@ -144,7 +144,7 @@ def main():
     print('configged enviro')
     # Load the robot and cooking items
     robot = CookingRobot()
-    robot.setPose(SE3(0,11.5,FLOOR_LVL) )
+    robot.setPose(SE3(1.15,11.5,FLOOR_LVL) *SE3.Rz(-pi/2))
     robot.robot.q = robot.robot.qr  # Update the robot's internal state to reflect its current pose
     print("++++++++++++++++++")
     print(robot.robot.fkine(robot.robot.qr).A[:3, 3])
@@ -164,17 +164,17 @@ def main():
         print("++++++++++++++++++")
         for q in find_and_flip[0]:
              robot.CookMove(q)
-             env.step(0.02)
+             env.step(0.06)
              robot.robot.q = q  # Update the robot's current configuration to the last configuration in the trajectory
 
         for q in find_and_flip[1]:
             robot.CookMove(q)
             tr = robot.robot.fkine(q).A
             patty.setPose(tr * robot.flipoffset)
-            env.step(0.02)
+            env.step(0.06)
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
-            env.step(0.02)
+            env.step(0.06)
         
     # Test the patty color change
     env.hold()

@@ -335,8 +335,9 @@ class CookingRobot:
         max_attempts = 1000  # Maximum number of attempts to find a valid IK solution.
         attempts = 0
         mindist = 10000
+        mindist2 = 10000
         while attempts < max_attempts:
-            q1 = self.robot.ikine_LM(offset_location,q0=q0, ilimit=200, slimit=10000, joint_limits=False)
+            q1 = self.robot.ikine_LM(offset_location,q0=q0)
             
             print("===================")
             print(f"tried Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
@@ -347,7 +348,7 @@ class CookingRobot:
             if mindist > self.calculate_distance(self.robot, q1.q, offset_location):
                 q0=q1.q
                 mindist = self.calculate_distance(self.robot, q1.q, offset_location)
-            if q1.success and self.calculate_distance(self.robot, q1.q, offset_location) <= 0.1:
+            if q1.success and self.calculate_distance(self.robot, q1.q, offset_location) <= 0.03:
                 break
             attempts += 1
         print(q1.q)
@@ -358,7 +359,20 @@ class CookingRobot:
 
         # 3. Flip Patty
         flip_loc = offset_location * SE3.Rx(pi)
-        q2 = self.robot.ikine_LM(flip_loc, q0=q0, joint_limits=True, mask=[0,0,1,1,1,1])
+        while attempts < max_attempts:
+            q2 = self.robot.ikine_LM(flip_loc,q0=q0, joint_limits=False)
+            
+            print("===================")
+            print(f"tried 2 Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
+            print('===but 2 distance===')
+            print(self.calculate_distance(self.robot, q1.q, offset_location))
+            print(q2.q)
+            
+            if mindist2 > self.calculate_distance(self.robot, q2.q, offset_location):
+                q0=q2.q
+                mindist = self.calculate_distance(self.robot, q2.q, offset_location)
+            if q2.success and self.calculate_distance(self.robot, q2.q, offset_location) <= 0.03:
+                break
         if q2.success:
             qtraj_flip = rtb.jtraj(q1.q, q2.q, 50).q
             full_qlist.append(qtraj_flip)
