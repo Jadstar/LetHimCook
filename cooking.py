@@ -181,7 +181,7 @@ class CookingRobot:
         self.AddtoEnv(env)
 
         patty = Patty(env=env)
-        patty.setPose(SE3(2,1,1))
+        patty.setPose(SE3(1,1,1))
         patty.AddtoEnv(env)
 
         goal_test = patty.getPose()
@@ -294,7 +294,7 @@ class CookingRobot:
         tr = self.robot.fkine(self.robot.q).A
         #moving Gripper as well
         # print(tr)
-        print(q)
+        # print(q)
         self.spatula.T = tr *  SE3.Rz(pi/2) * self.spatula_offset
         self.spatula_mount._T = tr * self.mount_offset
         self.camera.q[:3] = self.robot.q[:3]            # FetchCamera only has 5 links so only uses that are necesary
@@ -318,42 +318,47 @@ class CookingRobot:
         '''
         full_qlist = []
         location = patty.getPose()
-        offset_location = location  * self.patty_offset #Offset for the spatula to be in correct position to patty
-        print(offset_location)
+        print(location)
+        offset_location = location * self.patty_offset #Offset for the spatula to be in correct position to patty
         
 
         # 1. Move gripper above the patty
-        initalq = self.robot.q
-        initalq[1] = np.linalg.norm(location[0,3]+ location[1,3])
-        # print(f'initial q: {initalq}')
-
         q0 = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
-        q1 = self.robot.ikine_LM(offset_location,q0=q0,joint_limits=True)  # This should be a position above the patty
+        q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
+        q1 = self.robot.ikine_LM(offset_location,q0=q0, joint_limits=True)  # This should be a position above the patty
+        print(q1.reason)
         if q1.success:
             print(q1.q)
-            self.robot.q  
-            qtraj = rtb.jtraj(self.robot.q, q1.q,50).q
             print(self.robot.fkine(q1.q))
+            qtraj = rtb.jtraj(self.robot.q, q1.q,50).q
             full_qlist.append(qtraj)
-        # else:
-        #     print("q1 failed")
-
         
         # 2. Flip patty, use q1 pose as initial value for ikine
         flip_loc = offset_location * SE3.Rx(pi) 
-        
+        print(flip_loc)
         #It is ideal to reduce robot movement to prevent collsions, so x,y values with be masked in ikine and replaced with the q1 cartesian values
-        # q2 = self.robot.ikine_LM(flip_loc,q0=q1.q,joint_limits=True,mask=[0,0,1,1,1,1],ilimit=1000,slimit=200)  # This should be a position above the patty
-        # q2.q[:2] = q1.q[:2]
-        # if q2.success:
-        #     print(q2.q)
-        #     qtraj = rtb.jtraj(q1.q, q2.q,50).q
-        #     full_qlist.append(qtraj)
-        # else:
-        #     print("q2 failed")
-    
-        print
+        q2 = self.robot.ikine_LM(flip_loc,q0=q1.q,joint_limits=True,mask=[0,0,1,1,1,1])  # This should be a position above the patty
+        q2.q[:2] = q1.q[:2]
+        fk = self.robot.fkine(q2.q)
+        disparity = abs(flip_loc[:,3]- fk.A[:,3])
+        print(flip_loc)
+        print(fk)
+        while (disparity > 1e-1).any():
+            q2 = self.robot.ikine_LM(flip_loc,q0=q2.q,joint_limits=True,mask=[0,0,1,1,1,1])  # This should be a position above the patty
+            q2.q[:2] = q1.q[:2]
+            fk = self.robot.fkine(q2.q).A
+            disparity = abs(flip_loc[:,3]- fk[:,3])
+            print(f'Disparity: {disparity}')
+
+        if q2.success:
+            print(f'Disparity: {disparity}')
+
+            print(q2.q)
+            qtraj = rtb.jtraj(q1.q, q2.q,50).q
+            full_qlist.append(qtraj)
+
         return full_qlist
+
     def move_to_plate(self):
         '''
         TODO: Fix this function 
