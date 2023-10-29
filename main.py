@@ -1,6 +1,7 @@
 import swift
 import time
 from cooking import CookingRobot,Patty, FLIP_TEMP, DONE_TEMP, TIME_STEP
+from assembly import AssemblyRobot
 import spatialgeometry as geometry
 from PyQt5.QtWidgets import QApplication
 from spatialmath import SE3
@@ -90,7 +91,7 @@ def configEnviro(env,pattylist: list[Patty]):
     grill_path = 'assets/krustykrab.dae'
     grill_pose = SE3(0,0,1.5)
     grill = geometry.Mesh(grill_path,pose=grill_pose,scale=[5,5,5])
-    # env.add(grill)
+    env.add(grill)
 
     #Adding Patties on top of grill
     # print(grill_pose.A[1,3])
@@ -115,6 +116,22 @@ def configEnviro(env,pattylist: list[Patty]):
         patty.setPose(SE3(current_x, current_y, patty_z))
         patty.AddtoEnv(env)
         current_x += x_step
+
+    # add assembly bench
+
+    benchPath = 'assets/workingBench.stl'
+    benchPose = SE3(-1.5,12,0) @ SE3.Rx(pi/2)
+    bench = geometry.Mesh(benchPath, base=benchPose, scale=(0.0005,0.0012,0.001))
+    bench.color = (0.8,0.2,0.5,1)
+    env.add(bench)
+
+    platePath = 'assets/dinnerPlate.stl'
+    platePose = SE3(0,0,0) @ SE3.Rx(pi/2)
+    plate1 = geometry.Mesh(platePath, base=platePose, scale=(1,1,1))
+    plate1.color = (1,1,1,1)
+    env.add(plate1)
+
+
 
 def testpatty(robot):
     # Test heating the patty and visualizing the color change
@@ -162,6 +179,13 @@ def main():
     robot.setPose(SE3(0,11.5,FLOOR_LVL) *SE3.Rz(-pi/2))
     robot.CookMove(robot.robot.qr )
     robot.AddtoEnv(env)
+
+    assemblyRobot = AssemblyRobot()
+    assemblyRobot.setPose(SE3(-1.25, 10.3, 0.685))
+    assemblyRobot.robot.add_to_env(env)
+    assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
+
+
     input()
     for patty in pattylist:
         # First part of array finds patty, second part flips
