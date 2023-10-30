@@ -182,12 +182,15 @@ def main():
     input('ready to flip')
     
     for patty in pattylist:
+        while patty.temperature < FLIP_TEMP:
+            patty.heat(1, env)
+            time.sleep(0.5)
         # input('ready for next')
         # First part of array finds patty, second part flips
         
         # Check for Collisions 
         find_and_flip = robot.flip_patty(patty)
-        shape = Cuboid(scale=[4.74,0.45,0.45],color=[0.1,0.1,0.1,0])
+        shape = Cuboid(scale=[0.74,0.55,0.45],color=[0.1,0.1,0.1,0])
         print(shape.to_dict())
         shape.T = SE3(0.25,1.025,0.275)
         env.add(shape)

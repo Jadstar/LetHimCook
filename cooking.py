@@ -19,7 +19,7 @@ DONE_TEMP = 90  # temperature the patty is fully cooked
 TIME_STEP = 0.02  # simulation time step
 import time
 class Patty:
-    def __init__(self, position=SE3(0,0,0),env=None):
+    def __init__(self, position=SE3(0,0,0)):
         '''
         Initializes the Patty in the simulation environment.
         
@@ -29,7 +29,7 @@ class Patty:
         '''
         
         self.position = position
-        self.env = env
+        # self.env = env
         # Initialize patty temperature to room temperature
         self.temperature = ROOM_TEMP
         
@@ -58,14 +58,14 @@ class Patty:
     def AddtoEnv(self,env):
         env.add(self.mesh)
 
-    def heat(self, delta_temp):
+    def heat(self, delta_temp, env):
         '''
         Increase the temperature of the patty and update its color accordingly.
 
         delta_temp: Amount of temperature increase.
         '''
         self.temperature += delta_temp
-        self.update_color()
+        self.update_color(env)
 
     def get_color(self, temp):
         '''
@@ -94,7 +94,7 @@ class Patty:
         # Return as a tuple normalized to [0, 1]
         return tuple(clamped_color / 255.0)
 
-    def update_color(self):
+    def update_color(self, env):
         '''
         Updates the color of the patty mesh in the environment based on its temperature.
         '''
@@ -103,8 +103,8 @@ class Patty:
         self.mesh.color = new_color
         
         # Re-add the patty to the environment to force a visual update
-        self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.position), scale=self.scale, color=new_color)
-        self.AddtoEnv(self.env)
+        self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.mesh.T), scale=self.scale, color=new_color)
+        self.AddtoEnv(env)
 
         
 
@@ -365,7 +365,7 @@ class CookingRobot:
         mindist2 = 10000
         q1_successful = False
         q2_successful = False
-        boundary = CollisionBoundary(x_bounds=[-2.12,2.62], y_bounds=[0.8,1.25], z_bounds=[0,0.54])
+        boundary = CollisionBoundary(x_bounds=[-0.12,0.62], y_bounds=[0.7,1.25], z_bounds=[0,0.54])
 
         while attempts < max_attempts:
             q1 = self.robot.ikine_LM(offset_location, mask=[0.5,0.5,1,1,1,1])
