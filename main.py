@@ -1,6 +1,7 @@
 import swift
 import time
 from cooking import CookingRobot,Patty, FLIP_TEMP, DONE_TEMP, TIME_STEP
+from assembly import AssemblyRobot
 import spatialgeometry as geometry
 from PyQt5.QtWidgets import QApplication
 from spatialmath import SE3
@@ -116,6 +117,29 @@ def configEnviro(env,pattylist: list[Patty]):
         patty.AddtoEnv(env)
         current_x += x_step
 
+    # add assembly bench
+
+    benchPath = 'assets/workingBench.stl'
+    benchPose = SE3(-1.5,12,0) @ SE3.Rx(pi/2)
+    bench = geometry.Mesh(benchPath, base=benchPose, scale=(0.0005,0.0012,0.001))
+    bench.color = (0.8,0.2,0.5,1)
+    env.add(bench)
+
+    platePath = 'assets/dinnerPlate.stl'
+    platePose = SE3(0,0,0) @ SE3.Rx(pi/2)
+    plate1 = geometry.Mesh(platePath, base=platePose, scale=(1,1,1))
+    plate1.color = (1,1,1,1)
+    env.add(plate1)
+
+
+
+def testpatty(robot):
+    # Test heating the patty and visualizing the color change
+    while robot.patty.temperature < DONE_TEMP:
+        robot.patty.heat(1)  # Increase temperature by 1 degree for testing
+        print(f"Current Patty Temperature: {robot.patty.temperature}°C")  # Print the current temperature
+        time.sleep(0.2)
+
 def main():
     # Initialize the simulation environment
     env = swift.Swift()
@@ -151,7 +175,10 @@ def main():
     print(robot.robot.fkine(robot.robot.q).A[:3, 3])
     print("++++++++++++++++++")
     robot.CookMove(robot.robot.qr)
-    
+    assemblyRobot = AssemblyRobot()
+    assemblyRobot.setPose(SE3(-1.25, 10.3, 0.685))
+    assemblyRobot.robot.add_to_env(env)
+    assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
     robot.AddtoEnv(env)
     input('ready to flip')
     

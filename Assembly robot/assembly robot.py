@@ -3,6 +3,7 @@ import roboticstoolbox as rtb
 from spatialmath import SE3
 import spatialgeometry
 from ir_support import UR5, UR3
+from ir_support import *
 from math import pi
 from LinearUR3.LinearUR3 import LinearUR3
 from spatialmath.base import *
@@ -14,7 +15,6 @@ import matplotlib.pyplot as plt
 
 operation = 1 #0 - brick stacking, 1 - reach/ volume simulation
 debugMode = 0 #0 basic, 1 developer
-
 
 tableHeight = 0.6921
 steps = 50

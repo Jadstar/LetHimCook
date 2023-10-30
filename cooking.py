@@ -176,7 +176,7 @@ class CookingRobot:
         self.AddtoEnv(env)
 
         patty = Patty(env=env)
-        patty.setPose(SE3(2,1,1))
+        patty.setPose(SE3(1,1,1))
         patty.AddtoEnv(env)
 
         goal_test = patty.getPose()
