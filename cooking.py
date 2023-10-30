@@ -11,6 +11,7 @@ import os
 import spatialgeometry as geometry
 import numpy as np
 from math import pi
+import math
 ROOM_TEMP = 20  # in Celsius
 FLIP_TEMP = 70  # temperature to flip the patty
 DONE_TEMP = 90  # temperature the patty is fully cooked
@@ -221,7 +222,7 @@ class CookingRobot:
         finalpose = currpose.copy()
 
         # Modify the Z value in finalpose
-        finalpose[2, 3] = currpose[2, 3] + offset_z
+        finalpose[2, 3] = currpose[2, 3] + offset_z + offset_z
 
         print(currpose)
         print(finalpose)
@@ -278,8 +279,8 @@ class CookingRobot:
         # Store the current joint configuration and compute its forward kinematics
         initial_q = self.robot.q
         initial_position = self.robot.fkine(initial_q).A[:3, 3]  # Extracting the translation part
-        print('cookmove RobotPos')
-        print(self.robot.fkine(initial_q).A[:3, 3])
+        # print('cookmove RobotPos')
+        # print(self.robot.fkine(initial_q).A[:3, 3])
         # Adjust joint values for the prismatic torso lift
         if target_q[2] < 0:
             target_q[2] = 0
@@ -330,25 +331,27 @@ class CookingRobot:
         print(f"Patty Location: x={offset_location[0, 3]}, y={offset_location[1, 3]}, z={offset_location[2, 3]}")
         print(f"Initial Location: {self.robot.fkine(self.robot.q).A[:3, 3]}")
 
-        q0 = [0,0,0,0,0,0,0,0,0,0]
+        # q0 = [3.08682279,  0.73939816,  0.11610679, -1.55975507 , 0.25353835 , 1.6032338,-1.70977876,  0.23614514,  0.18641132,  1.59052798]
+        q0=[1.62, -2.166, 0.08587, -0.4418, 0.007674, -0.5102, 0.1855, 1.453,
+ -0.2802, -0.9157]
         q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
         max_attempts = 1000  # Maximum number of attempts to find a valid IK solution.
         attempts = 0
         mindist = 10000
         mindist2 = 10000
         while attempts < max_attempts:
-            q1 = self.robot.ikine_LM(offset_location,q0=q0)
-            
-            print("===================")
+            q1 = self.robot.ikine_LM(offset_location,ilimit=10001,slimit=1000, mask=[0.5,0.5,1,1,1,1])
+            # Convert joint values to Cartesian coordinates
+            print("===================^")
             print(f"tried Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
             print('===but distance===')
             print(self.calculate_distance(self.robot, q1.q, offset_location))
-            print(q1.q)
+            print(q1)
             
             if mindist > self.calculate_distance(self.robot, q1.q, offset_location):
                 q0=q1.q
                 mindist = self.calculate_distance(self.robot, q1.q, offset_location)
-            if q1.success and self.calculate_distance(self.robot, q1.q, offset_location) <= 0.03:
+            if q1.success and self.calculate_distance(self.robot, q1.q, offset_location) <= 0.01:
                 break
             attempts += 1
         print(q1.q)
@@ -359,31 +362,28 @@ class CookingRobot:
 
         # 3. Flip Patty
         flip_loc = offset_location * SE3.Rx(pi)
+        attempts = 0
+        q0 = q1.q
         while attempts < max_attempts:
-            q2 = self.robot.ikine_LM(flip_loc,q0=q0, joint_limits=False)
+            q2 = self.robot.ikine_LM(flip_loc,q0=q0,joint_limits=True, mask=[0.3,0.3,1,1,1,1])
             
             print("===================")
-            print(f"tried 2 Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
+            print(f"tried 2 Moving to Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
             print('===but 2 distance===')
-            print(self.calculate_distance(self.robot, q1.q, offset_location))
+            print(self.calculate_distance(self.robot, q2.q, flip_loc))
             print(q2.q)
             
-            if mindist2 > self.calculate_distance(self.robot, q2.q, offset_location):
+            if mindist2 > self.calculate_distance(self.robot, q2.q, flip_loc):
                 q0=q2.q
-                mindist = self.calculate_distance(self.robot, q2.q, offset_location)
-            if q2.success and self.calculate_distance(self.robot, q2.q, offset_location) <= 0.03:
+                mindist = self.calculate_distance(self.robot, q2.q, flip_loc)
+            if q2.success and self.calculate_distance(self.robot, q2.q, flip_loc) <= 0.01:
                 break
         if q2.success:
             qtraj_flip = rtb.jtraj(q1.q, q2.q, 50).q
             full_qlist.append(qtraj_flip)
             print(f"Flipping Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
-
-        # 4. Return to Above Position
-        q3 = self.robot.ikine_LM(offset_location, q0=q2.q, joint_limits=True)
-        if q3.success:
-            qtraj_return = rtb.jtraj(q2.q, q3.q, 50).q
-            full_qlist.append(qtraj_return)
-            print(f"Returning Above Patty: {self.robot.fkine(q3.q).A[:3, 3]}")
+        attempts = 0
+        
 
         return full_qlist
 

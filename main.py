@@ -88,15 +88,15 @@ def configEnviro(env,pattylist: list[Patty]):
     '''
     #Adding Grill
     grill_path = 'assets/krustykrab.dae'
-    grill_pose = SE3(0,0,1.5)
+    grill_pose = SE3(-0.2,11.5,1.5)*SE3.Rz(-pi)
     grill = geometry.Mesh(grill_path,pose=grill_pose,scale=[5,5,5])
     env.add(grill)
 
     #Adding Patties on top of grill
     # print(grill_pose.A[1,3])
 
-    patty_x_bounds = [-0.82, -0.02]
-    patty_y_bounds = [10.25, 10.7]
+    patty_x_bounds = [-0.12,0.62]
+    patty_y_bounds = [0.8,1.25 ]
     patty_z = 0.75
 
     # Number of patties to create
@@ -144,7 +144,7 @@ def main():
     print('configged enviro')
     # Load the robot and cooking items
     robot = CookingRobot()
-    robot.setPose(SE3(1.15,11.5,FLOOR_LVL) *SE3.Rz(-pi/2))
+    # robot.setPose(SE3(1.2,11.5,FLOOR_LVL) *SE3.Rz(-pi/2))
     robot.robot.q = robot.robot.qr  # Update the robot's internal state to reflect its current pose
     print("++++++++++++++++++")
     print(robot.robot.fkine(robot.robot.qr).A[:3, 3])
@@ -156,7 +156,7 @@ def main():
     input('ready to flip')
     
     for patty in pattylist:
-        input('ready for next')
+        # input('ready for next')
         # First part of array finds patty, second part flips
         find_and_flip = robot.flip_patty(patty)
         print("++++++++++++++++++")
@@ -164,17 +164,17 @@ def main():
         print("++++++++++++++++++")
         for q in find_and_flip[0]:
              robot.CookMove(q)
-             env.step(0.06)
+            #  env.step(0.02)
              robot.robot.q = q  # Update the robot's current configuration to the last configuration in the trajectory
 
         for q in find_and_flip[1]:
             robot.CookMove(q)
             tr = robot.robot.fkine(q).A
             patty.setPose(tr * robot.flipoffset)
-            env.step(0.06)
+            # env.step(0.02)
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
-            env.step(0.06)
+            # env.step(0.02)
         
     # Test the patty color change
     env.hold()
