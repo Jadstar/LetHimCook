@@ -340,7 +340,7 @@ class CookingRobot:
         mindist = 10000
         mindist2 = 10000
         while attempts < max_attempts:
-            q1 = self.robot.ikine_LM(offset_location,ilimit=10001,slimit=1000, mask=[0.5,0.5,1,1,1,1])
+            q1 = self.robot.ikine_LM(offset_location, mask=[0.5,0.5,1,1,1,1])
             # Convert joint values to Cartesian coordinates
             print("===================^")
             print(f"tried Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")

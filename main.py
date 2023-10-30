@@ -164,17 +164,17 @@ def main():
         print("++++++++++++++++++")
         for q in find_and_flip[0]:
              robot.CookMove(q)
-            #  env.step(0.02)
+             env.step(0.01)
              robot.robot.q = q  # Update the robot's current configuration to the last configuration in the trajectory
 
         for q in find_and_flip[1]:
             robot.CookMove(q)
             tr = robot.robot.fkine(q).A
             patty.setPose(tr * robot.flipoffset)
-            # env.step(0.02)
+            env.step(0.01)
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
-            # env.step(0.02)
+            env.step(0.01)
         
     # Test the patty color change
     env.hold()
