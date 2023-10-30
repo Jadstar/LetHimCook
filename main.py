@@ -187,25 +187,24 @@ def main():
         
         # Check for Collisions 
         find_and_flip = robot.flip_patty(patty)
-        shape = Cuboid(scale=[1.15,0.8,0.50])
+        shape = Cuboid(scale=[11.25,1.2,0.60],color=[0.1,0.1,0.1,0])
         print(shape.to_dict())
         shape.T = SE3(0.25,1.025,0.275)
-    
         env.add(shape)
-        shape._added_to_swift =True
+        # shape._added_to_swift =True
         print(f"THIS IS THE SHAPE: {shape.fk_dict()}")
         # print(robot.robot.links[0].closest_point(shape)[0])
-        link0dist = robot.robot.links[2].closest_point(shape)[0]
-        if link0dist == None:
-            link0dist = 0
-        while robot.robot.collided(shape=shape,q=find_and_flip,skip=True) and link0dist < 0.1:
-            print("Collided With thing")
-            find_and_flip = robot.flip_patty(patty, q0=[0,0,0,0,0,0,0,0,0,0])
-            for i in robot.robot.links[2:]:
-                print(i.closest_point(shape)[0])
-                link0dist = robot.robot.links[0].closest_point(shape)[0]
-                if link0dist == None:
-                    link0dist = 0
+        # link0dist = robot.robot.links[2].closest_point(shape)[0]
+        # if link0dist == None:
+        #     link0dist = 0
+        # while robot.robot.collided(shape=shape,q=find_and_flip,skip=True) and link0dist < 0.1:
+        #     print("Collided With thing")
+        #     find_and_flip = robot.flip_patty(patty)
+        #     for i in robot.robot.links[2:]:
+        #         print(i.closest_point(shape)[0])
+        #         link0dist = robot.robot.links[0].closest_point(shape)[0]
+        #         if link0dist == None:
+        #             link0dist = 0
         print("++++++++++++++++++")
         print(robot.robot.fkine(robot.robot.q).A[:3, 3])
         print("++++++++++++++++++")
