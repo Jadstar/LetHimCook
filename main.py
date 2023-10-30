@@ -182,10 +182,13 @@ def main():
     input('ready to flip')
     
     for patty in pattylist:
-        while patty.temperature < FLIP_TEMP:
-            patty.heat(1, env)
-            time.sleep(0.2)
-            print(patty.temperature)
+        # while patty.temperature < FLIP_TEMP:
+        #     patty.heat(1, env)
+        #     pattylist[1].heat(1, env)
+        #     pattylist[2].heat(1, env)
+        #     pattylist[3].heat(1, env)
+        #     time.sleep(0.05)
+        #     print(patty.temperature)
         # input('ready for next')
         # First part of array finds patty, second part flips
         
@@ -214,14 +217,14 @@ def main():
         print("++++++++++++++++++")
         for q in find_and_flip[0]:
              robot.CookMove(q)
-             env.step(0.01)
+             env.step(0.06)
              robot.robot.q = q  # Update the robot's current configuration to the last configuration in the trajectory
 
         for q in find_and_flip[1]:
             robot.CookMove(q)
             tr = robot.robot.fkine(q).A
             patty.setPose(tr * robot.flipoffset)
-            env.step(0.01)
+            env.step(0.06)
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
             env.step(0.01)
