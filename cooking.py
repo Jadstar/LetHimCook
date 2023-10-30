@@ -100,12 +100,13 @@ class Patty:
         '''
         # Calculate the new color based on temperature
         new_color = self.get_color(self.temperature)
-        self.mesh.color = new_color
+        # self.mesh.color = new_color
         
         # Re-add the patty to the environment to force a visual update
-        self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.mesh.T), scale=self.scale, color=new_color)
-        self.AddtoEnv(env)
-
+        newpatty = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.mesh.T), scale=self.scale, color=new_color)
+        newpatty.attach_to(self.mesh)
+        env.add(newpatty)
+        # self.mesh =self.mesh
         
 
 class CookingRobot:

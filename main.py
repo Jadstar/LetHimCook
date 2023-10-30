@@ -184,7 +184,8 @@ def main():
     for patty in pattylist:
         while patty.temperature < FLIP_TEMP:
             patty.heat(1, env)
-            time.sleep(0.5)
+            time.sleep(0.2)
+            print(patty.temperature)
         # input('ready for next')
         # First part of array finds patty, second part flips
         
