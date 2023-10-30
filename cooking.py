@@ -12,6 +12,7 @@ import spatialgeometry as geometry
 import numpy as np
 from math import pi
 import math
+
 ROOM_TEMP = 20  # in Celsius
 FLIP_TEMP = 70  # temperature to flip the patty
 DONE_TEMP = 90  # temperature the patty is fully cooked
@@ -316,11 +317,35 @@ class CookingRobot:
         calculated_position = robot.fkine(q).A[:3, 3]
         return np.linalg.norm(calculated_position - np.array([offset_location[0, 3], offset_location[1, 3], offset_location[2, 3]]))
 
-    def flip_patty(self, patty : type(Patty)):
+    def check_trajectory_collision(self, robot, trajectory, boundary):
+            '''
+            Checks if any configuration in the trajectory causes a collision.
+            
+            robot: The robot object.
+            trajectory: List of joint configurations.
+            boundary: CollisionBoundary object.
+            
+            Returns True if collision is detected, False otherwise.
+            '''
+            for q in trajectory:
+                # Convert the joint configuration to its Cartesian coordinate
+                pose = robot.fkine(q).A
+                position = (pose[0, 3], pose[1, 3], pose[2, 3])
+                
+                # Check for collisions with the boundary
+                if boundary.check_collision(position):
+                    return True
+            return False
+    
+    def flip_patty(self, patty, q0=[1.62, -2.166, 0.08587, -0.4418, 0.007674, -0.5102, 0.1855, 1.453, -0.2802, -0.9157]):
         '''
         Creates a list of joint values to move the spatula to the patty and flip it over.
         This version also prints the global locations the robot will move between.
+        It also checks for collisions using the predefined collision boundary.
         '''
+        
+        
+
         full_qlist = []
 
         # 1. Get Patty Location
@@ -331,30 +356,30 @@ class CookingRobot:
         print(f"Patty Location: x={offset_location[0, 3]}, y={offset_location[1, 3]}, z={offset_location[2, 3]}")
         print(f"Initial Location: {self.robot.fkine(self.robot.q).A[:3, 3]}")
 
-        # q0 = [3.08682279,  0.73939816,  0.11610679, -1.55975507 , 0.25353835 , 1.6032338,-1.70977876,  0.23614514,  0.18641132,  1.59052798]
-        q0=[1.62, -2.166, 0.08587, -0.4418, 0.007674, -0.5102, 0.1855, 1.453,
- -0.2802, -0.9157]
+        
         q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
         max_attempts = 1000  # Maximum number of attempts to find a valid IK solution.
         attempts = 0
         mindist = 10000
         mindist2 = 10000
+        q1_successful = False
+        q2_successful = False
         while attempts < max_attempts:
-            q1 = self.robot.ikine_LM(offset_location, mask=[0.5,0.5,1,1,1,1])
+            q1 = self.robot.ikine_LM(offset_location,q0=q0 ,mask=[0.5,0.5,1,1,1,1])
             # Convert joint values to Cartesian coordinates
             print("===================^")
             print(f"tried Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
             print('===but distance===')
             print(self.calculate_distance(self.robot, q1.q, offset_location))
             print(q1)
-            
             if mindist > self.calculate_distance(self.robot, q1.q, offset_location):
                 q0=q1.q
                 mindist = self.calculate_distance(self.robot, q1.q, offset_location)
             if q1.success and self.calculate_distance(self.robot, q1.q, offset_location) <= 0.01:
                 break
             attempts += 1
-        print(q1.q)
+            print(q1.q)
+       
         if q1.success:
             qtraj_to_patty = rtb.jtraj(self.robot.q, q1.q, 50).q
             full_qlist.append(qtraj_to_patty)
@@ -365,25 +390,26 @@ class CookingRobot:
         attempts = 0
         q0 = q1.q
         while attempts < max_attempts:
-            q2 = self.robot.ikine_LM(flip_loc,q0=q0,joint_limits=True, mask=[0.3,0.3,1,1,1,1])
-            
-            print("===================")
+            q2 = self.robot.ikine_LM(flip_loc,q0=q0, mask=[0.5,0.5,1,1,1,1])
+            # Convert joint values to Cartesian coordinates
+            print("===================^")
             print(f"tried 2 Moving to Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
             print('===but 2 distance===')
             print(self.calculate_distance(self.robot, q2.q, flip_loc))
-            print(q2.q)
-            
+            print(q1)
             if mindist2 > self.calculate_distance(self.robot, q2.q, flip_loc):
                 q0=q2.q
-                mindist = self.calculate_distance(self.robot, q2.q, flip_loc)
+                mindist2 = self.calculate_distance(self.robot, q2.q, flip_loc)
             if q2.success and self.calculate_distance(self.robot, q2.q, flip_loc) <= 0.01:
                 break
-        if q2.success:
-            qtraj_flip = rtb.jtraj(q1.q, q2.q, 50).q
-            full_qlist.append(qtraj_flip)
-            print(f"Flipping Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
-        attempts = 0
+            attempts += 1
+            print(q2.q)
         
+       
+        if q2.success:
+            qtraj_to_patty = rtb.jtraj(q1.q, q2.q, 50).q
+            full_qlist.append(qtraj_to_patty)
+            print(f"Moving 2 to Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
 
         return full_qlist
 
@@ -429,11 +455,44 @@ class CookingRobot:
 
             self.env.step(TIME_STEP)
 
+class CollisionBoundary:
+    def __init__(self, x_bounds, y_bounds, z_bounds):
+        self.x_bounds = x_bounds
+        self.y_bounds = y_bounds
+        self.z_bounds = z_bounds
+
+    def check_collision(self, point):
+        """
+        Checks if the given point collides with the boundary.
+        
+        :param point: A 3-tuple (x, y, z)
+        :return: True if there is a collision, False otherwise
+        """
+        x, y, z = point
+
+        # Check if the point is outside the boundary on any axis
+        if (x < self.x_bounds[0] or x > self.x_bounds[1] or
+            y < self.y_bounds[0] or y > self.y_bounds[1] or
+            z < self.z_bounds[0] or z > self.z_bounds[1]):
+            return False
+
+        return True
+
+# if __name__ == "__main__":
+    # env = swift.Swift()
+    # env.launch(realtime= True)
+    # r = CookingRobot()
+    # # r.MotionTest()
+    # r.PattyFlipTest()
+    # # Initialize the collision boundary with the given bounds
+
+    # Initialize the collision boundary with the given bounds
+    
+
+    # # Test the collision boundary
+    # test_point = (0, 1.9, 0.2)
+    # collision = boundary.check_collision(test_point)
+    # print(collision)
 
 
-if __name__ == "__main__":
-    env = swift.Swift()
-    env.launch(realtime= True)
-    r = CookingRobot()
-    # r.MotionTest()
-    r.PattyFlipTest()
+

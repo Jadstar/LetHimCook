@@ -10,9 +10,10 @@ from math import pi
 import random
 from GUI import PattyVisualizer
 import roboticstoolbox as rtb
+from spatialgeometry import Cuboid
 
 #Determines how many patties will be on grill
-NUM_OF_PATTIES =12
+NUM_OF_PATTIES = 4
 #Where the floor starts (z axis) on the swift env
 FLOOR_LVL = 0
 
@@ -89,7 +90,7 @@ def configEnviro(env,pattylist: list[Patty]):
     '''
     #Adding Grill
     grill_path = 'assets/krustykrab.dae'
-    grill_pose = SE3(-0.2,11.5,1.5)*SE3.Rz(-pi)
+    grill_pose = SE3(-0.2,11.5,1.3)*SE3.Rz(-pi)
     grill = geometry.Mesh(grill_path,pose=grill_pose,scale=[5,5,5])
     env.add(grill)
 
@@ -98,7 +99,7 @@ def configEnviro(env,pattylist: list[Patty]):
 
     patty_x_bounds = [-0.12,0.62]
     patty_y_bounds = [0.8,1.25 ]
-    patty_z = 0.75
+    patty_z = 0.55
 
     # Number of patties to create
 
@@ -119,17 +120,17 @@ def configEnviro(env,pattylist: list[Patty]):
 
     # add assembly bench
 
-    benchPath = 'assets/workingBench.stl'
-    benchPose = SE3(-1.5,12,0) @ SE3.Rx(pi/2)
-    bench = geometry.Mesh(benchPath, base=benchPose, scale=(0.0005,0.0012,0.001))
-    bench.color = (0.8,0.2,0.5,1)
-    env.add(bench)
+    # benchPath = 'assets/workingBench.stl'
+    # benchPose = SE3(-1.5,2,0)*SE3.Rx(pi/2)
+    # bench = geometry.Mesh(benchPath, pose=benchPose, scale=[0.0005,0.0012,0.001])
+    # # bench.color = (0.8,0.2,0.5,1)
+    # env.add(bench)
 
-    platePath = 'assets/dinnerPlate.stl'
-    platePose = SE3(0,0,0) @ SE3.Rx(pi/2)
-    plate1 = geometry.Mesh(platePath, base=platePose, scale=(1,1,1))
-    plate1.color = (1,1,1,1)
-    env.add(plate1)
+    # platePath = 'assets/dinnerPlate.stl'
+    # platePose = SE3(0,0,0)*SE3.Rx(pi/2)
+    # plate1 = geometry.Mesh(platePath, pose=platePose, scale=[1,1,1])
+    # plate1.color = (1,1,1,1)
+    # env.add(plate1)
 
 
 
@@ -153,9 +154,7 @@ def main():
     for i in range(NUM_OF_PATTIES):
         patty = Patty()
         pattylist.append(patty)
-        
-    print(pattylist)
-    
+            
     # Initialize the GUI for Patty Visualization
     # app = QApplication([])
     # window = PattyVisualizer()
@@ -175,17 +174,38 @@ def main():
     print(robot.robot.fkine(robot.robot.q).A[:3, 3])
     print("++++++++++++++++++")
     robot.CookMove(robot.robot.qr)
-    assemblyRobot = AssemblyRobot()
-    assemblyRobot.setPose(SE3(-1.25, 10.3, 0.685))
-    assemblyRobot.robot.add_to_env(env)
-    assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
+    # assemblyRobot = AssemblyRobot()
+    # assemblyRobot.setPose(SE3(-1.25, 10.3, 0.685))
+    # assemblyRobot.robot.add_to_env(env)
+    # assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
     robot.AddtoEnv(env)
     input('ready to flip')
     
     for patty in pattylist:
         # input('ready for next')
         # First part of array finds patty, second part flips
+        
+        # Check for Collisions 
         find_and_flip = robot.flip_patty(patty)
+        shape = Cuboid(scale=[1.15,0.8,0.50])
+        print(shape.to_dict())
+        shape.T = SE3(0.25,1.025,0.275)
+    
+        env.add(shape)
+        shape._added_to_swift =True
+        print(f"THIS IS THE SHAPE: {shape.fk_dict()}")
+        # print(robot.robot.links[0].closest_point(shape)[0])
+        link0dist = robot.robot.links[2].closest_point(shape)[0]
+        if link0dist == None:
+            link0dist = 0
+        while robot.robot.collided(shape=shape,q=find_and_flip,skip=True) and link0dist < 0.1:
+            print("Collided With thing")
+            find_and_flip = robot.flip_patty(patty, q0=[0,0,0,0,0,0,0,0,0,0])
+            for i in robot.robot.links[2:]:
+                print(i.closest_point(shape)[0])
+                link0dist = robot.robot.links[0].closest_point(shape)[0]
+                if link0dist == None:
+                    link0dist = 0
         print("++++++++++++++++++")
         print(robot.robot.fkine(robot.robot.q).A[:3, 3])
         print("++++++++++++++++++")
