@@ -187,7 +187,7 @@ def main():
         
         # Check for Collisions 
         find_and_flip = robot.flip_patty(patty)
-        shape = Cuboid(scale=[11.25,1.2,0.60],color=[0.1,0.1,0.1,0])
+        shape = Cuboid(scale=[4.74,0.45,0.45],color=[0.1,0.1,0.1,0])
         print(shape.to_dict())
         shape.T = SE3(0.25,1.025,0.275)
         env.add(shape)

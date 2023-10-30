@@ -359,21 +359,21 @@ class CookingRobot:
 
         q0=[1.62, -2.166, 0.08587, -0.4418, 0.007674, -0.5102, 0.1855, 1.453, -0.2802, -0.9157]
         q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
-        max_attempts = 1000  # Maximum number of attempts to find a valid IK solution.
+        max_attempts = 100000  # Maximum number of attempts to find a valid IK solution.
         attempts = 0
         mindist = 10000
         mindist2 = 10000
         q1_successful = False
         q2_successful = False
-        boundary = CollisionBoundary(x_bounds=[-0.12,0.62], y_bounds=[0.8,1.25], z_bounds=[0,0.54])
+        boundary = CollisionBoundary(x_bounds=[-2.12,2.62], y_bounds=[0.8,1.25], z_bounds=[0,0.54])
 
         while attempts < max_attempts:
             q1 = self.robot.ikine_LM(offset_location, mask=[0.5,0.5,1,1,1,1])
             qtraj_to_patty = rtb.jtraj(self.robot.q, q1.q, 50).q
             for qt in qtraj_to_patty:
                 f1 = self.robot.fkine_all(qt)
-                for j in f1:
-                    print(j)
+                # for j in f1:
+                    # print(j)s
                     
             # Convert joint values to Cartesian coordinates
             print("===================^")
@@ -381,7 +381,8 @@ class CookingRobot:
             print('===but distance===')
             print(self.calculate_distance(self.robot, q1.q, offset_location))
             print(q1)
-
+            print("ATTEMPTING++++++++++++++++++++")
+            print(attempts)
 
             if not self.check_trajectory_collision(self.robot, qtraj_to_patty, boundary):
                 q1_successful = True
@@ -493,10 +494,17 @@ class CollisionBoundary:
         if (x < self.x_bounds[0] or x > self.x_bounds[1] or
             y < self.y_bounds[0] or y > self.y_bounds[1] or
             z < self.z_bounds[0] or z > self.z_bounds[1]):
+            print("============FALSE=============")
+            print(self.x_bounds[0], " <-- ",x, " --> ", self.x_bounds[1])
+            print(self.y_bounds[0], " <-- ",y, " --> ", self.y_bounds[1])
+            print(self.z_bounds[0], " <-- ",z, " --> ", self.z_bounds[1])
+            print("============FALSE=============")
             return False
+        print("============TRUE=============")
         print(self.x_bounds[0], " <-- ",x, " --> ", self.x_bounds[1])
-        print(self.y_bounds[0], " <-- ",x, " --> ", self.y_bounds[1])
-        print(self.z_bounds[0], " <-- ",x, " --> ", self.z_bounds[1])
+        print(self.y_bounds[0], " <-- ",y, " --> ", self.y_bounds[1])
+        print(self.z_bounds[0], " <-- ",z, " --> ", self.z_bounds[1])
+        print("============TRUE=============")
         return True
 
 # if __name__ == "__main__":
