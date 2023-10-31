@@ -11,6 +11,23 @@ import random
 from GUI import PattyVisualizer
 import roboticstoolbox as rtb
 from spatialgeometry import Cuboid
+import detect
+
+#Sensor mode will use real picture to determine how many patties enter 
+SENSOR_MODE = 0 
+
+Image_check = '' # impage to check
+
+# Run detect Code
+# Get output of detect code 
+
+#For length of detect code, add that many patties
+
+#if you can do it, extract the x,y coords of the boxes, 
+# find the center, and then thats ur center of ur patty
+#then u can do the dist between patties to show how the poses work
+
+
 
 #Determines how many patties will be on grill
 NUM_OF_PATTIES = 4
