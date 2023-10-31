@@ -225,7 +225,7 @@ class DetectThread(QThread):
 
                                     original_img = im0
                                     cropped_img = im0[y1:y2, x1:x2]
-                                    if(object_name=='resistor'):
+                                    if(object_name=='Broodje'):
                                         resistor_path = f'GUI\Database\croppedImgs\{object_name}_{over}.png'
                                         if cropped_img.shape[0] > cropped_img.shape[1]:
                                             # Rotate the image by 90 degrees
@@ -362,6 +362,7 @@ class DetectThread(QThread):
                 print(f'Done. ({time.time() - t0:.3f}s)')
                 self.progress_update.emit(100)
                 self.running = False
+                
             except:
                 self.errorFlag = 1
                 # self.running = False
