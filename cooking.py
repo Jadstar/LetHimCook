@@ -35,7 +35,7 @@ class Patty:
         
         # Determine color based on temperature
         self.is_flipped = False
-        self.color = self.get_color(70)
+        self.color = self.get_color(self.temperature)
         # Load the patty into the simulation at the given position
         self.scale = [0.0015, 0.0015, 0.0015]
         self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=position, color=self.color,scale=self.scale)
@@ -100,12 +100,12 @@ class Patty:
         '''
         # Calculate the new color based on temperature
         new_color = self.get_color(self.temperature)
-        self.mesh.color = new_color
-        
-        # Re-add the patty to the environment to force a visual update
-        newpatty = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.mesh.T), scale=self.scale, color=new_color)
-        # newpatty.attach_to(self.mesh)
-        env.add(newpatty)
+        # self.mesh.color = new_color
+        env.step(0.2)
+        # # Re-add the patty to the environment to force a visual update
+        # newpatty = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.mesh.T), scale=self.scale, color=new_color)
+        # # newpatty.attach_to(self.mesh)
+        # env.add(newpatty)
         # self.mesh =self.mesh
         
 

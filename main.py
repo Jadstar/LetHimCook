@@ -1,4 +1,12 @@
 import swift
+import sys
+from PyQt5.uic import loadUi
+from PyQt5 import QtWidgets
+from PyQt5.QtCore import pyqtSlot
+from PyQt5.QtWidgets import QApplication, QDialog
+# import resource
+# from model import Model
+from out_window import Ui_OutputDialog
 import time
 from cooking import CookingRobot,Patty, FLIP_TEMP, DONE_TEMP, TIME_STEP
 from assembly import AssemblyRobot
@@ -12,10 +20,52 @@ from GUI import PattyVisualizer
 import roboticstoolbox as rtb
 from spatialgeometry import Cuboid
 import detect
+import mainwindow
+NUM_OF_PATTIES = 4
+class Ui_Dialog(QDialog):
+    def __init__(self):
+        super(Ui_Dialog, self).__init__()
+        loadUi("mainwindow.ui", self)
 
+        self.runButton.clicked.connect(self.runSlot)
+
+        self._new_window = None
+        # self.Videocapture_ = None
+
+    def refreshAll(self):
+        """
+        Set the text of lineEdit once it's valid
+        """
+        # self.Videocapture_ = "0"
+
+    @pyqtSlot()
+    def runSlot(self):
+        """
+        Called when the user presses the Run button
+        """
+        print("Clicked Run")
+        self.refreshAll()
+        self.hide()  # hide the main window
+        self.outputWindow_()  # Create and open new output window
+
+    def outputWindow_(self):
+        """
+        Created new window for vidual output of the video in GUI
+        """
+        self._new_window = Ui_OutputDialog()
+        self._new_window.patties_detected_signal.connect(self.handle_cropped_imgs)
+
+        self._new_window.show()
+    def handle_cropped_imgs(self, cropped_imgs):
+        global NUM_OF_PATTIES
+        NUM_OF_PATTIES = len(cropped_imgs)
+        print(f"Detected {NUM_OF_PATTIES} patties.")  # This will print the number of patties
+        # self._new_window.startVideo(self.Videocapture_)
+        # print("Video Played")
 #Sensor mode will use real picture to determine how many patties enter 
-SENSOR_MODE = 0 
 
+
+    # You can add any further processing code here
 Image_check = '' # impage to check
 
 # Run detect Code
@@ -30,7 +80,7 @@ Image_check = '' # impage to check
 
 
 #Determines how many patties will be on grill
-NUM_OF_PATTIES = 4
+
 #Where the floor starts (z axis) on the swift env
 FLOOR_LVL = 0
 
@@ -160,6 +210,13 @@ def testpatty(robot):
 
 def main():
     # Initialize the simulation environment
+    
+    app = QApplication(mainwindow.sys.argv)
+    ui = Ui_Dialog()
+    ui.show()
+    # sys.exit(app.exec_())
+    app.exec_()  # This will block until Ui_Dialog is closed
+
     env = swift.Swift()
     env.launch(realtime=True)
     
@@ -196,27 +253,24 @@ def main():
     # assemblyRobot.robot.add_to_env(env)
     # assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
     robot.AddtoEnv(env)
-    input('ready to flip')
+    # input('ready to flip')
     
     for patty in pattylist:
-        # while patty.temperature < FLIP_TEMP:
-        #     patty.heat(1, env)
-        #     pattylist[1].heat(1, env)
-        #     pattylist[2].heat(1, env)
-        #     pattylist[3].heat(1, env)
-        #     time.sleep(0.05)
-        #     print(patty.temperature)
+        while patty.temperature < FLIP_TEMP:
+            patty.heat(1, env)
+            time.sleep(0.05)
+            print(patty.temperature) # COLOUR CHANGING BROKEN
         # input('ready for next')
         # First part of array finds patty, second part flips
         
         # Check for Collisions 
         find_and_flip = robot.flip_patty(patty)
-        shape = Cuboid(scale=[0.74,0.55,0.45],color=[0.1,0.1,0.1,0])
-        print(shape.to_dict())
-        shape.T = SE3(0.25,1.025,0.275)
-        env.add(shape)
-        # shape._added_to_swift =True
-        print(f"THIS IS THE SHAPE: {shape.fk_dict()}")
+        # shape = Cuboid(scale=[0.74,0.55,0.45],color=[0.1,0.1,0.1,0])
+        # print(shape.to_dict())
+        # shape.T = SE3(0.25,1.025,0.275)
+        # env.add(shape)
+        # # shape._added_to_swift =True
+        # print(f"THIS IS THE SHAPE: {shape.fk_dict()}")
         # print(robot.robot.links[0].closest_point(shape)[0])
         # link0dist = robot.robot.links[2].closest_point(shape)[0]
         # if link0dist == None:
@@ -248,7 +302,8 @@ def main():
         
     # Test the patty color change
     env.hold()
-    
+    sys.exit(app.exec_())
 
 if __name__ == "__main__":
+    
     main()

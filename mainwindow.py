@@ -10,7 +10,7 @@ from out_window import Ui_OutputDialog
 class Ui_Dialog(QDialog):
     def __init__(self):
         super(Ui_Dialog, self).__init__()
-        loadUi("GUI\mainwindow.ui", self)
+        loadUi("mainwindow.ui", self)
 
         self.runButton.clicked.connect(self.runSlot)
 

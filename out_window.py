@@ -1,9 +1,9 @@
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.uic import loadUi
-from PyQt5.QtCore import Qt,QSize
+from PyQt5.QtCore import Qt,QSize,pyqtSignal
 from PyQt5.QtWidgets import QGridLayout,QLabel,QListWidget,QDialog,QFileDialog,QMessageBox,QVBoxLayout,QListWidgetItem
 from componentimg import imagingComponents,Camera
-from PIL.ImageQt import ImageQt
+# from PIL.ImageQt import ImageQt
 from  detect import DetectThread,BoundaryBox
 import os
 import tempfile
@@ -15,11 +15,12 @@ class Ui_OutputDialog(QDialog):
 
     _imaging = imagingComponents
     layout = QGridLayout()
+    patties_detected_signal = pyqtSignal(list)  # Signal that emits a list
 
     tempImgpath = ""                #temporary path that will be used in case photo is taken
     def __init__(self):
         super(Ui_OutputDialog, self).__init__()
-        loadUi("GUI\out_window.ui", self)
+        loadUi("out_window.ui", self)
         defaultImg = QPixmap(self._imaging.getImg(self))
         self.imglabel.setPixmap(defaultImg)     #setting default images 
         self.imglabel.setScaledContents(True)
@@ -45,59 +46,18 @@ class Ui_OutputDialog(QDialog):
         self.progress_bar.setVisible(False)
 
         self.ComponentValue.setEnabled(False)
-        self.ComponentValue.clicked.connect(self.show_found_resistors)
+        self.ComponentValue.clicked.connect(self.return_patties)
 
         self.AddSimulatorButton.clicked.connect(self.AddToSim)
         self.AddSimulatorButton.setEnabled(False)
         #Elec sim portion
-        self._new_window = MainSpace()
+        # self._new_window = MainSpace()
 
 
-    def show_found_resistors(self):
-            '''
-            Used to run CV code on identified resistors
-            '''
-            msg_box = QMessageBox(self)
-            list_widget = QListWidget(self)
-            print("clicked show resistors")
-            path_list = []
-            for i,item in enumerate(self.detect_thread.getCroppedImgs()):
-                bounding_box_item = item['box']
-                path = item['path']
-
-                image = QPixmap(path).scaled(500, 500, Qt.KeepAspectRatio)
-                label =QLabel()
-                label.setPixmap(image)
-                path_list.append(path)
-                
-                bbox = BoundaryBox(bounding_box_item['x'],bounding_box_item['y'],bounding_box_item['width'],bounding_box_item['height'])
-                item = QListWidgetItem()
-                item.setFlags(item.flags())
-                list_widget.addItem(item)
-                item.setSizeHint(QSize(100,150))
-
-                list_widget.setItemWidget(item,label)
-
-        
-
-            msg_box.setWindowTitle("Select a Resistor to Find its Value")
-            msg_box.setText("Found Resistors:")
-            list_widget.setMinimumWidth(list_widget.sizeHintForColumn(0))
-            list_widget.setMinimumHeight(list_widget.sizeHintForRow(0)*3)  
-            list_widget.resize(list_widget.sizeHint())
-            msg_box.layout().addWidget(list_widget)
-
-            list_widget.itemDoubleClicked.connect(lambda item: msg_box.done(QMessageBox.Ok))
-
-            result = msg_box.exec_()
-            if result == QMessageBox.Ok:
-                selected_index = list_widget.currentRow()
-                print("running resistor " + str(selected_index))
-                self._imaging.setImg(self,path_list[selected_index])  # Update _image
-                print(path_list[selected_index])
-                self.UpdateData()  # Call UpdateData()
-            else:
-                return None
+    def return_patties(self):
+        cropped_imgs = self.detect_thread.getCroppedImgs()
+        self.patties_detected_signal.emit(cropped_imgs)  # Emit the signal with the cropped images
+        self.close()  # Close the dialog
     def show_available_webcams(self):
         '''
         Shows the available webcams connected to the device
@@ -166,19 +126,19 @@ class Ui_OutputDialog(QDialog):
 
         print("Adding to simulation")
 
-        #getting resistor data
-        value = self.Value.text()
-        tolerance = self.ToleranceValue.text()
-        resistor =  ElecC.Resistor((30,30),value)
+        # #getting resistor data
+        # value = self.Value.text()
+        # tolerance = self.ToleranceValue.text()
+        # resistor =  ElecC.Resistor((30,30),value)
 
-        # Adding the new resistor to the list of components
-        self._new_window.components.append(resistor)
+        # # Adding the new resistor to the list of components
+        # self._new_window.components.append(resistor)
 
-        # Adding all components to the new window
-        for component in self._new_window.components:
-            self._new_window.AddComponent(component)
-        #Opening simulation window
-        self._new_window.show()
+        # # Adding all components to the new window
+        # for component in self._new_window.components:
+        #     self._new_window.AddComponent(component)
+        # #Opening simulation window
+        # self._new_window.show()
 
     def update_progress(self, percent_complete):
         '''
@@ -197,15 +157,17 @@ class Ui_OutputDialog(QDialog):
             self.progress_bar.setValue(0)
             errorPopup = QMessageBox(self)
             errorPopup.setWindowTitle("Scanning Error")
-            errorPopup.setText("We have not found any resistors in this image")
-            self.Contours.setText("No resistors found")
+            errorPopup.setText("We have not found any Patties in this image")
+            self.Contours.setText("No Patties found")
 
             errorPopup.exec_()
         #After YoloV7 is complete 
         if percent_complete == 100:
             self.progress_bar.setVisible(False)
-            self.Contours.setText("Scan Complete, we found " + str(len(self.detect_thread.getCroppedImgs()))+ " resistors")
+            self.Contours.setText("Scan Complete, we found " + str(len(self.detect_thread.getCroppedImgs()))+ " Patties")
             self.Contours.adjustSize()
+            # self.close()  # Close the PyQt window
+            # return self.detect_thread.getCroppedImgs()
             self._imaging.setImg(self,self.detect_thread.getOutputImg())
             # Since the output image is a cropped version of the original, we must show that on GUI
         
@@ -244,7 +206,7 @@ class Ui_OutputDialog(QDialog):
         save_img = 1
         try:
             print("PATH BELOW")
-            weights = os.path.abspath(r"GUI\best.pt")
+            weights = os.path.abspath(r"best.pt")
             print(weights)
             # weights = r'C:\Users\Jaden\Github\the-rock\GUI\best.pt'
         except:
@@ -260,7 +222,7 @@ class Ui_OutputDialog(QDialog):
         trace = 1
         name ='exp'
         augment = 1
-        confThresh = 0.60
+        confThresh = 0.15
         iou = 0.45
         save_conf = 1
         self.detect_thread = DetectThread(source,save_img,weights,view_img,save_txt,imgsz,trace,name,augment,save_conf,iou,confThresh)
@@ -364,36 +326,36 @@ class Ui_OutputDialog(QDialog):
 
 
         # Contours =ImageQt(self._imaging.getContours(self))
-        readimg = ImageQt(self._imaging.findColours(self))
-        histPixmap = QPixmap.fromImage(readimg).scaled(500,80,aspectRatioMode=Qt.KeepAspectRatio)
+        # readimg = ImageQt(self._imaging.findColours(self))
+        # histPixmap = QPixmap.fromImage(readimg).scaled(500,80,aspectRatioMode=Qt.KeepAspectRatio)
         self.Value.setText("N/A")
-        self.ToleranceValue.setText("N/A")
-        labels = [self.c1_value, self.c2_value, self.c3_value, self.c4_value, self.c5_value]
-        for i in labels:
-            i.setText("N/A")
+        # self.ToleranceValue.setText("N/A")
+        # labels = [self.c1_value, self.c2_value, self.c3_value, self.c4_value, self.c5_value]
+        # for i in labels:
+        #     i.setText("N/A")
 
-        numbands = len(self._imaging.getColourBands(self))
+        # numbands = len(self._imaging.getColourBands(self))
 
-        print(numbands)
-        if numbands >= 3:
+        # print(numbands)
+        # if numbands >= 3:
 
-            self.Contours.setPixmap(histPixmap)
-            self.Value.setText(self._imaging.getResistanceValue(self) + "Ω") 
-            self.ToleranceValue.setText(self._imaging.getTolerance(self))
+        #     self.Contours.setPixmap(histPixmap)
+        #     self.Value.setText(self._imaging.getResistanceValue(self) + "Ω") 
+        #     self.ToleranceValue.setText(self._imaging.getTolerance(self))
 
-            # updating colour bands (we have to check how many bands)
+        #     # updating colour bands (we have to check how many bands)
             
-            colour_bands = self._imaging.getColourBands(self)
-            print(colour_bands)
-            labels = [self.c1_value, self.c2_value, self.c3_value, self.c4_value, self.c5_value]
-            print(labels)
-            for i in range(numbands):
-                labels[i].setText(colour_bands[i])
-        else:
-            self.Contours.setText("Error finding value of resistor")
-        #If there is data, allow adding to simulation
-        if self.Value.text() != "N/A" or self.Value.text() != "-": 
-            self.AddSimulatorButton.setEnabled(True)
+        #     colour_bands = self._imaging.getColourBands(self)
+        #     print(colour_bands)
+        #     labels = [self.c1_value, self.c2_value, self.c3_value, self.c4_value, self.c5_value]
+        #     print(labels)
+        #     for i in range(numbands):
+        #         labels[i].setText(colour_bands[i])
+        # else:
+        #     self.Contours.setText("Error finding value of resistor")
+        # #If there is data, allow adding to simulation
+        # if self.Value.text() != "N/A" or self.Value.text() != "-": 
+        #     self.AddSimulatorButton.setEnabled(True)
 
 
     def update_camera(self, frame):
