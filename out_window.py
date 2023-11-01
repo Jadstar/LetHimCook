@@ -1,7 +1,7 @@
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.uic import loadUi
 from PyQt5.QtCore import Qt,QSize,pyqtSignal
-from PyQt5.QtWidgets import QGridLayout,QLabel,QListWidget,QDialog,QFileDialog,QMessageBox,QVBoxLayout,QListWidgetItem
+from PyQt5.QtWidgets import QPushButton,QGridLayout,QLabel,QListWidget,QDialog,QFileDialog,QMessageBox,QVBoxLayout,QListWidgetItem
 from componentimg import imagingComponents,Camera
 # from PIL.ImageQt import ImageQt
 from  detect import DetectThread,BoundaryBox
@@ -16,6 +16,8 @@ class Ui_OutputDialog(QDialog):
     _imaging = imagingComponents
     layout = QGridLayout()
     patties_detected_signal = pyqtSignal(list)  # Signal that emits a list
+    emergency_button = pyqtSignal(bool)
+    
 
     tempImgpath = ""                #temporary path that will be used in case photo is taken
     def __init__(self):
@@ -50,13 +52,47 @@ class Ui_OutputDialog(QDialog):
 
         self.AddSimulatorButton.clicked.connect(self.AddToSim)
         self.AddSimulatorButton.setEnabled(False)
-        #Elec sim portion
-        # self._new_window = MainSpace()
 
+        self.estop = QPushButton("E-STOP",self)
+        self.estop.setGeometry(400,530,100,100)
+        self.estop.setStyleSheet(
+            "background-color: red;"
+            "border-radius: 50px;"  # Half of the square size for a circle
+            "color: white;"
+            "font-size: 12pt;"
+        )
+        self.estop.clicked.connect(self.EmergencyStop)
+        self.estop.setEnabled(False)
 
+        self.gobutton = QPushButton("GO",self)
+        self.gobutton.setGeometry(290,530,80,80)
+        self.gobutton.setStyleSheet(
+            "background-color: green;"
+            "border-radius: 40px;"  # Half of the square size for a circle
+            "color: white;"
+            "font-size: 12pt;"
+        )
+        self.gobutton.clicked.connect(self.RunRobot)
+
+    def RunRobot(self):
+        print("GO BUTTON PRESSED")
+        self.gobutton.setText("CONFIRM?")
+        if self.gobutton.text() == "CONFIRM?":
+            value = False
+            self.emergency_button.emit(value)
+            self.estop.setEnabled(True)
+            self.gobutton.setEnabled(False)
+            self.gobutton.setText("GO")
+    def EmergencyStop(self):
+        print("EMERGENCY STOP PRESSED - STOPPING ROBOT")
+        value = True
+        self.emergency_button.emit(value)
+        self.estop.setEnabled(False)
+        self.gobutton.setEnabled(True)
     def return_patties(self):
         cropped_imgs = self.detect_thread.getCroppedImgs()
         self.patties_detected_signal.emit(cropped_imgs)  # Emit the signal with the cropped images
+        
         self.close()  # Close the dialog
     def show_available_webcams(self):
         '''

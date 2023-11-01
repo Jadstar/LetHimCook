@@ -11,7 +11,7 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>&quot;Grounded&quot; - Computer Vision Interface</string>
+   <string>The LETHIMCOOK SCANNER</string>
   </property>
   <widget class="QWidget" name="centralwidget" native="true">
    <property name="geometry">
@@ -286,7 +286,7 @@
      </font>
     </property>
     <property name="text">
-     <string>Add to Simulation</string>
+     <string>Open Manual Control Menu</string>
     </property>
    </widget>
   </widget>
