@@ -211,11 +211,11 @@ def testpatty(robot):
 def main():
     # Initialize the simulation environment
     
-    app = QApplication(mainwindow.sys.argv)
-    ui = Ui_Dialog()
-    ui.show()
-    # sys.exit(app.exec_())
-    app.exec_()  # This will block until Ui_Dialog is closed
+    # app = QApplication(mainwindow.sys.argv)
+    # ui = Ui_Dialog()
+    # ui.show()
+    # # sys.exit(app.exec_())
+    # app.exec_()  # This will block until Ui_Dialog is closed
 
     env = swift.Swift()
     env.launch(realtime=True)
@@ -228,14 +228,15 @@ def main():
     for i in range(NUM_OF_PATTIES):
         patty = Patty()
         pattylist.append(patty)
-            
-    # Initialize the GUI for Patty Visualization
+        print('>>>>>>>>>>>>>')
+        print(patty)
+    # Initialize the GUI for Patty Vis  ualization
     # app = QApplication([])
     # window = PattyVisualizer()
     # window.show()
 
     # app.exec_()  
-
+    
     #Config Environment
     configEnviro(env,pattylist)
     print('configged enviro')
@@ -253,24 +254,23 @@ def main():
     # assemblyRobot.robot.add_to_env(env)
     # assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
     robot.AddtoEnv(env)
-    # input('ready to flip')
-    
+    shape = Cuboid(scale=[1.05,0.55,0.5])
+    wall = Cuboid(scale=[20,9.85,10])
+    wall.T = SE3(0.275,6.25,0)
+    # print(shape.to_dict())
+    shape.T = SE3(0.25,0.975,0.275)
+    env.add(shape)
+    env.add(wall)
+    shape._added_to_swift =True
     for patty in pattylist:
         while patty.temperature < FLIP_TEMP:
             patty.heat(1, env)
-            time.sleep(0.05)
-            print(patty.temperature) # COLOUR CHANGING BROKEN
+            # time.sleep(5)
         # input('ready for next')
         # First part of array finds patty, second part flips
-        
         # Check for Collisions 
         find_and_flip = robot.flip_patty(patty)
-        # shape = Cuboid(scale=[0.74,0.55,0.45],color=[0.1,0.1,0.1,0])
-        # print(shape.to_dict())
-        # shape.T = SE3(0.25,1.025,0.275)
-        # env.add(shape)
-        # # shape._added_to_swift =True
-        # print(f"THIS IS THE SHAPE: {shape.fk_dict()}")
+        
         # print(robot.robot.links[0].closest_point(shape)[0])
         # link0dist = robot.robot.links[2].closest_point(shape)[0]
         # if link0dist == None:
@@ -283,11 +283,14 @@ def main():
         #         link0dist = robot.robot.links[0].closest_point(shape)[0]
         #         if link0dist == None:
         #             link0dist = 0
+        
         print("++++++++++++++++++")
         print(robot.robot.fkine(robot.robot.q).A[:3, 3])
         print("++++++++++++++++++")
         for q in find_and_flip[0]:
              robot.CookMove(q)
+             print("BELOWER")
+            #  print(env.swift_objects)
              env.step(0.06)
              robot.robot.q = q  # Update the robot's current configuration to the last configuration in the trajectory
 
@@ -295,6 +298,7 @@ def main():
             robot.CookMove(q)
             tr = robot.robot.fkine(q).A
             patty.setPose(tr * robot.flipoffset)
+            
             env.step(0.06)
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
@@ -302,7 +306,7 @@ def main():
         
     # Test the patty color change
     env.hold()
-    sys.exit(app.exec_())
+    # sys.exit(app.exec_())
 
 if __name__ == "__main__":
     
