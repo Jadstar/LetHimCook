@@ -8,7 +8,8 @@ from spatialmath import SE3
 import threading
 from math import pi
 import random
-
+from GUI import PattyVisualizer
+from spatialmath.base import transl
 
 
 #Determines how many patties will be on grill
@@ -89,9 +90,9 @@ def configEnviro(env,pattylist: list[Patty]):
     '''
     #Adding Grill
     grill_path = 'assets/krustykrab.dae'
-    grill_pose = SE3(0,0,1.5)
+    grill_pose = SE3(-0.2,-11.5,1.5)
     grill = geometry.Mesh(grill_path,pose=grill_pose,scale=[5,5,5])
-    env.add(grill)
+    #env.add(grill)
 
     #Adding Patties on top of grill
     # print(grill_pose.A[1,3])
@@ -120,16 +121,10 @@ def configEnviro(env,pattylist: list[Patty]):
     # add assembly bench
 
     benchPath = 'assets/workingBench.stl'
-    benchPose = SE3(-1.5,12,0) @ SE3.Rx(pi/2)
-    bench = geometry.Mesh(benchPath, base=benchPose, scale=(0.0005,0.0012,0.001))
-    bench.color = (0.8,0.2,0.5,1)
+    benchPose = SE3(-1.75, 0.6, 0) @ SE3.Rx(pi/2)
+    bench = geometry.Mesh(benchPath, base=benchPose, scale=(0.0005,0.00125,0.001))
+    bench.color = (0.37,0.57,0.97,1)
     env.add(bench)
-
-    platePath = 'assets/dinnerPlate.stl'
-    platePose = SE3(0,0,0) @ SE3.Rx(pi/2)
-    plate1 = geometry.Mesh(platePath, base=platePose, scale=(1,1,1))
-    plate1.color = (1,1,1,1)
-    env.add(plate1)
 
 
 
@@ -160,16 +155,16 @@ def main():
     robot.AddtoEnv(env=env)
     
     # Initialize the GUI for Patty Visualization
-    app = QApplication([])
-    window = PattyVisualizer()
-    window.show()
+    # app = QApplication([])
+    # window = PattyVisualizer()
+    # window.show()
 
     # Start the testpatty function in a separate thread
-    test_thread = threading.Thread(target=testpatty, args=(patty, window, env))
-    test_thread.start()
+    #test_thread = threading.Thread(target=testpatty, args=(patty, window, env))
+    #test_thread.start()
 
     # Start the GUI's main loop
-    app.exec_()  
+    # app.exec_()  
 
     #Config Environment
     configEnviro(env,pattylist)
@@ -180,10 +175,64 @@ def main():
     robot.CookMove(robot.robot.qr )
     robot.AddtoEnv(env)
 
+
+
+    tomatoSaucePath = 'assets/tomatoSauce.stl'
+    tomatoSaucePose = SE3(-1.7, -0.3, 0.67) @ SE3.Rx(pi/2)
+    tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
+    tomatoSauce.color = (1.0,0,0,1.0)
+    env.add(tomatoSauce)
+
+    platePath = 'assets/dinnerPlate.stl'
+    platePose = SE3(-1.4, -0.5, 0.7)
+    plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.001,0.001,0.001))
+    plate1.color = (1.0,1.0,1.0,1.0)
+    env.add(plate1)
+
     assemblyRobot = AssemblyRobot()
-    assemblyRobot.setPose(SE3(-1.25, 10.3, 0.685))
+    assemblyRobot.setPose(SE3(-1.39, -1.10, 0.685))
     assemblyRobot.robot.add_to_env(env)
-    assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
+
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+
+    for q in assemblyQMatrix:
+        assemblyRobot.robot.q = q
+
+        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        tomatoSauce.T = fkine
+
+        env.step(0.05)
+
+    assemblyQMatrix = assemblyRobot.move(mode='circle', t=1)
+
+    for q in assemblyQMatrix:
+        assemblyRobot.robot.q = q
+
+        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        tomatoSauce.T = fkine
+
+        env.step(0.05)
+
+
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.6,0.6,0.3], targetRPY=[0,pi,0], t=1)
+
+    for q in assemblyQMatrix:
+        assemblyRobot.robot.q = q
+
+        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        tomatoSauce.T = fkine
+
+        env.step(0.05)
+
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+
+    for q in assemblyQMatrix:
+        assemblyRobot.robot.q = q
+
+        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        tomatoSauce.T = fkine
+
+        env.step(0.05)
 
 
     input()
@@ -209,7 +258,7 @@ def main():
     testpatty(robot)
     env.hold()
     
-    test_thread.join()
+    #test_thread.join()
 
 if __name__ == "__main__":
     main()
