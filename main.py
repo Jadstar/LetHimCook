@@ -96,7 +96,7 @@ def configEnviro(env,pattylist: list[Patty]):
     '''
     #Adding Grill
     grill_path = 'assets/krustykrab.dae'
-    grill_pose = SE3(-0.2,11.5,1.3)*SE3.Rz(-pi)
+    grill_pose = SE3(-0.2,11.5,1.5)*SE3.Rz(-pi)
     grill = geometry.Mesh(grill_path,pose=grill_pose,scale=[5,5,5])
     env.add(grill)
 
@@ -105,7 +105,7 @@ def configEnviro(env,pattylist: list[Patty]):
 
     patty_x_bounds = [-0.12,0.62]
     patty_y_bounds = [0.8,1.25 ]
-    patty_z = 0.55
+    patty_z = 0.75
 
     # Number of patties to create
 
@@ -181,7 +181,7 @@ def main():
     # assemblyRobot.robot.add_to_env(env)
     # assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
     robot.AddtoEnv(env)
-    shape = Cuboid(scale=[1.05,0.55,0.5])
+    shape = Cuboid(scale=[1,0.5,0.7])
     wall = Cuboid(scale=[20,9.85,10])
     wall.T = SE3(0.275,6.25,0)
     # print(shape.to_dict())
