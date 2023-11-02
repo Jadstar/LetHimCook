@@ -21,7 +21,7 @@ import roboticstoolbox as rtb
 from spatialgeometry import Cuboid
 import detect
 import mainwindow
-NUM_OF_PATTIES = 4
+NUM_OF_PATTIES = 1
 class Ui_Dialog(QDialog):
     def __init__(self):
         super(Ui_Dialog, self).__init__()
@@ -84,72 +84,11 @@ Image_check = '' # impage to check
 #Where the floor starts (z axis) on the swift env
 FLOOR_LVL = 0
 
-def testpatty(patty, window, env):
+platePose = SE3(1,1,0.5)
+plate_translation = platePose.A[:3, 3]  # Get the translation from the 4x4 matrix
+print(f"Plate Location: x={plate_translation[0]}, y={plate_translation[1]}, z={plate_translation[2]}")
     
-    while True:
-        # If emergency stop is not requested, continue cooking
-        while not window.emergency_stop_requested and patty.temperature < DONE_TEMP:
-            patty.heat(1)  # Increase temperature by 1 degree for testing
-            print(f"Current Patty Temperature: {patty.temperature}°C")
-            window.update_display(patty.temperature)
-            time.sleep(0.2)
-
-        # If the patty is done cooking, break out of the loop
-        if patty.temperature >= DONE_TEMP:
-            break
-
-        # If emergency stop is requested, pause and wait for it to be unset
-        while window.emergency_stop_requested:
-            time.sleep(0.5)
-            
-def movingIntotest():
-    env = swift.Swift()
-    env.launch(realtime=True)
-
-    #Generate a number of Patties on Grill
-    pattylist = []
-    for i in range(NUM_OF_PATTIES):
-        patty = Patty()
-        pattylist.append(patty)
-
-    #Config Environment
-    configEnviro(env,pattylist)
-
-    # Load the robot and cooking items
-    robot = CookingRobot()
-    robot.setPose(SE3(-20,-12,FLOOR_LVL))
-    robot.CookMove(robot.robot.qr )
-    robot.AddtoEnv(env)
-
-    #Robot
-    move_forward =SE3(0,-12,0)
-    move1 = robot.moveToPos(move_forward)
-    q1 = robot.robot.q
-    qtraj = rtb.ctraj(robot.getPose(),move_forward,t=50)
-    input()
-    for q in qtraj:
-        print(q)
-        robot.setPose(q)
-        env.step(0.05)
-        # time.sleep(1)
-    secondmove = SE3(0,-8,0) * SE3.Rz(pi/2)
-    qtraj = rtb.ctraj(robot.getPose(),secondmove,t=50)
     
-
-    for q in qtraj:
-            print(q)
-            robot.setPose(q)
-            env.step(0.05)
-    thirdmove =SE3(1.1,10,0)* SE3.Rz(pi/2)
-    qtraj = rtb.ctraj(robot.getPose(),thirdmove,t=50)
-    input()
-
-    for q in qtraj:
-            print(q)
-            robot.setPose(q)
-            env.step(0.1)
-    env.hold()
-
 def configEnviro(env,pattylist: list[Patty]):
     '''
     Implementing all environmental components in the env
@@ -193,20 +132,10 @@ def configEnviro(env,pattylist: list[Patty]):
     # # bench.color = (0.8,0.2,0.5,1)
     # env.add(bench)
 
-    # platePath = 'assets/dinnerPlate.stl'
-    # platePose = SE3(0,0,0)*SE3.Rx(pi/2)
-    # plate1 = geometry.Mesh(platePath, pose=platePose, scale=[1,1,1])
+    platePath = 'assets/dinnerPlate.stl'
+    plate1 = geometry.Mesh(platePath, pose=platePose, scale=[0.001,0.001,0.001])
     # plate1.color = (1,1,1,1)
-    # env.add(plate1)
-
-
-
-def testpatty(robot):
-    # Test heating the patty and visualizing the color change
-    while robot.patty.temperature < DONE_TEMP:
-        robot.patty.heat(1)  # Increase temperature by 1 degree for testing
-        print(f"Current Patty Temperature: {robot.patty.temperature}°C")  # Print the current temperature
-        time.sleep(0.2)
+    env.add(plate1)
 
 def main():
     # Initialize the simulation environment
@@ -228,8 +157,6 @@ def main():
     for i in range(NUM_OF_PATTIES):
         patty = Patty()
         pattylist.append(patty)
-        print('>>>>>>>>>>>>>')
-        print(patty)
     # Initialize the GUI for Patty Vis  ualization
     # app = QApplication([])
     # window = PattyVisualizer()
@@ -271,19 +198,6 @@ def main():
         # Check for Collisions 
         find_and_flip = robot.flip_patty(patty)
         
-        # print(robot.robot.links[0].closest_point(shape)[0])
-        # link0dist = robot.robot.links[2].closest_point(shape)[0]
-        # if link0dist == None:
-        #     link0dist = 0
-        # while robot.robot.collided(shape=shape,q=find_and_flip,skip=True) and link0dist < 0.1:
-        #     print("Collided With thing")
-        #     find_and_flip = robot.flip_patty(patty)
-        #     for i in robot.robot.links[2:]:
-        #         print(i.closest_point(shape)[0])
-        #         link0dist = robot.robot.links[0].closest_point(shape)[0]
-        #         if link0dist == None:
-        #             link0dist = 0
-        
         print("++++++++++++++++++")
         print(robot.robot.fkine(robot.robot.q).A[:3, 3])
         print("++++++++++++++++++")
@@ -303,7 +217,35 @@ def main():
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
             env.step(0.01)
+    for patty in pattylist:
+        while patty.temperature < DONE_TEMP:
+            patty.heat(1, env)
+            # time.sleep(5)
+        # input('ready for next')
+        # First part of array finds patty, second part flips
+        # Check for Collisions 
+        find_and_flip = robot.move_to_plate(patty, platePose)
         
+        print("++++++++++++++++++")
+        print(robot.robot.fkine(robot.robot.q).A[:3, 3])
+        print("++++++++++++++++++")
+        for q in find_and_flip[0]:
+            robot.CookMove(q)
+            env.step(0.06)
+            robot.robot.q = q
+
+
+        # Perform the flipping action at the plate
+        for q in find_and_flip[1]:
+            robot.CookMove(q)
+            tr = robot.robot.fkine(q).A
+            patty.setPose(tr * robot.flipoffset)
+            env.step(0.06)
+
+        # Apply gravity effect to the patty if needed
+        for s in robot.PattyGravity(patty):
+            patty.setPose(s)
+            env.step(0.01)
     # Test the patty color change
     env.hold()
     # sys.exit(app.exec_())
