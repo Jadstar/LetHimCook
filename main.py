@@ -21,6 +21,8 @@ import roboticstoolbox as rtb
 from spatialgeometry import Cuboid
 import detect
 import mainwindow
+from spatialmath.base import transl
+
 NUM_OF_PATTIES = 1
 class Ui_Dialog(QDialog):
     def __init__(self):
@@ -96,7 +98,7 @@ def configEnviro(env,pattylist: list[Patty]):
     '''
     #Adding Grill
     grill_path = 'assets/krustykrab.dae'
-    grill_pose = SE3(-0.2,11.5,1.5)*SE3.Rz(-pi)
+    grill_pose = SE3(-0.2,11.5,1.3)*SE3.Rz(-pi)
     grill = geometry.Mesh(grill_path,pose=grill_pose,scale=[5,5,5])
     env.add(grill)
 
@@ -105,7 +107,7 @@ def configEnviro(env,pattylist: list[Patty]):
 
     patty_x_bounds = [-0.12,0.62]
     patty_y_bounds = [0.8,1.25 ]
-    patty_z = 0.75
+    patty_z = 0.55
 
     # Number of patties to create
 
@@ -126,11 +128,7 @@ def configEnviro(env,pattylist: list[Patty]):
 
     # add assembly bench
 
-    # benchPath = 'assets/workingBench.stl'
-    # benchPose = SE3(-1.5,2,0)*SE3.Rx(pi/2)
-    # bench = geometry.Mesh(benchPath, pose=benchPose, scale=[0.0005,0.0012,0.001])
-    # # bench.color = (0.8,0.2,0.5,1)
-    # env.add(bench)
+    
 
     platePath = 'assets/dinnerPlate.stl'
     plate1 = geometry.Mesh(platePath, pose=platePose, scale=[0.001,0.001,0.001])
@@ -148,7 +146,11 @@ def main():
 
     env = swift.Swift()
     env.launch(realtime=True)
-    
+    tomatoSaucePath = 'assets/tomatoSauce.stl'
+    tomatoSaucePose = SE3(0.79, -0.8, 0.67) @ SE3.Rx(pi/2)
+    tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
+    tomatoSauce.color = (1.0,0,0,1.0)
+    env.add(tomatoSauce)
     # patty = Patty(env=env)
     # patty.setPose(SE3(2, 1, 1))
     # patty.AddtoEnv(env)
@@ -176,16 +178,16 @@ def main():
     print(robot.robot.fkine(robot.robot.q).A[:3, 3])
     print("++++++++++++++++++")
     robot.CookMove(robot.robot.qr)
-    # assemblyRobot = AssemblyRobot()
-    # assemblyRobot.setPose(SE3(-1.25, 10.3, 0.685))
-    # assemblyRobot.robot.add_to_env(env)
-    # assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
+    assemblyRobot = AssemblyRobot()
+    assemblyRobot.setPose(SE3(1, 0, 0))
+    assemblyRobot.robot.add_to_env(env)
+    
     robot.AddtoEnv(env)
-    shape = Cuboid(scale=[1,0.5,0.7])
+    shape = Cuboid(scale=[1,0.5,0.5])
     wall = Cuboid(scale=[20,9.85,10])
     wall.T = SE3(0.275,6.25,0)
     # print(shape.to_dict())
-    shape.T = SE3(0.25,0.975,0.275)
+    shape.T = SE3(0.25,1.075,0.275)
     env.add(shape)
     env.add(wall)
     shape._added_to_swift =True
@@ -246,7 +248,45 @@ def main():
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
             env.step(0.01)
-    # Test the patty color change
+        assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+        for q in assemblyQMatrix:
+            assemblyRobot.robot.q = q
+
+            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+            tomatoSauce.T = fkine
+
+            env.step(0.05)
+
+        assemblyQMatrix = assemblyRobot.move(mode='circle', t=1)
+
+        for q in assemblyQMatrix:
+            assemblyRobot.robot.q = q
+
+            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+            tomatoSauce.T = fkine
+
+            env.step(0.05)
+
+
+        assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.6,0.6,0.3], targetRPY=[0,pi,0], t=1)
+
+        for q in assemblyQMatrix:
+            assemblyRobot.robot.q = q
+
+            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+            tomatoSauce.T = fkine
+
+            env.step(0.05)
+
+        assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+
+        for q in assemblyQMatrix:
+            assemblyRobot.robot.q = q
+
+            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+            tomatoSauce.T = fkine
+
+            env.step(0.05)
     env.hold()
     # sys.exit(app.exec_())
 

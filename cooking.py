@@ -132,7 +132,7 @@ class CookingRobot:
         self.camera = FetchCamera()
         spatula_mount_path = 'fetch_robotdata/accessories/SpatulaMount.STL'
         spatula_path = 'fetch_robotdata/accessories/Spatula.stl'
-        self.boundary = CollisionBoundary(x_bounds=[-0.275,0.725], y_bounds=[0.725,1.225], z_bounds=[0,0.7])
+        self.boundary = CollisionBoundary(x_bounds=[-0.275,0.725], y_bounds=[0.725,1.225], z_bounds=[0,0.5])
         self.wallbound = CollisionBoundary(x_bounds=[-9.75,10.25], y_bounds=[1.4,11.25], z_bounds=[-5,5])
         # self.boundary = CollisionBoundary(x_bounds=[0,0], y_bounds=[0,0], z_bounds=[0,0])
         # self.wallbound = CollisionBoundary(x_bounds=[0,0], y_bounds=[0,0], z_bounds=[0,0])
