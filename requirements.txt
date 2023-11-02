@@ -2,6 +2,7 @@
 
 # Robot
 roboticstoolbox-python
+ir_support
 
 # Machine Learning Base ----------------------------------------
 matplotlib>=3.2.2

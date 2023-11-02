@@ -40,6 +40,7 @@ class Patty:
         self.scale = [0.0015, 0.0015, 0.0015]
         self.mesh = geometry.Mesh('assets/BurgerPatty.stl', pose=position, color=self.color,scale=self.scale)
         # self.update_color()
+    
 
     def getPose(self):
         '''
@@ -158,7 +159,22 @@ class CookingRobot:
         # Initialization
         self.patty_flipped = False
         self.patty_is_cooked = False
-    
+
+
+    def getRobotLinks(self):
+        links = []
+        for link in self.robot.links:
+            if link.isjoint:
+                links.append(link)
+
+        return links
+    def getCameraLinks(self):
+        links = []
+        for link in self.camera.links:
+            if link.isjoint:
+                links.append(link)
+
+        return links
     def getPose(self):
         return self.robot.base
     def setPose(self,position):

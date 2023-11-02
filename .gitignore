@@ -2,5 +2,3 @@
 .venv2
 traced_model.pt
 .venv1
-.venv2
-traced_model.pt

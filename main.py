@@ -25,8 +25,9 @@ from assembly import AssemblyRobot
 NUM_OF_PATTIES = 4      #Default No of Patties
 FLOOR_LVL = 0           #Where the floor starts (z axis) on the swift env
 ESTOP = False
+RESET = True
 PICKUP_THRESHOLD = 0.05
-
+TEACH_Q_VALS= [0,0,0,0,0,0,0,0,0,0]
 class Ui_Dialog(QDialog):
     '''
     THIS IS THE CLASS TO RUN THE GUI OPENING TO THE ROBOT
@@ -69,12 +70,24 @@ class Ui_Dialog(QDialog):
         self._new_window = Ui_OutputDialog()
         self._new_window.patties_detected_signal.connect(self.uploadScannedPatties)
         self._new_window.emergency_button.connect(self.startstop)
+        self._new_window.robotlinks.connect(self.getTeachModelChanges)
+        self._new_window.reset.connect(self.resetRobot)
         self._new_window.show()
     def uploadScannedPatties(self, cropped_imgs):
         global NUM_OF_PATTIES
         NUM_OF_PATTIES = len(cropped_imgs)
         print(f"Detected {NUM_OF_PATTIES} patties.")  # This will print the number of patties
 
+    def getTeachModelChanges(self,linkvalue):
+        global TEACH_Q_VALS
+        TEACH_Q_VALS[linkvalue[1]] = linkvalue[0]
+        # print(TEACH_Q_VALS)
+        
+    def resetRobot(self,value):
+        global RESET
+        global TEACH_Q_VALS
+        RESET = value
+        TEACH_Q_VALS = [0,0,0,0,0,0,0,0,0,0]
     def startstop(self,value):
         global ESTOP
         ESTOP = value
@@ -138,7 +151,8 @@ def configEnviro(env,pattylist: list[Patty]):
 
 def main():
     global ESTOP
-    print(f"ESTOP IS {ESTOP}")
+    global TEACH_Q_VALS
+    # print(f"ESTOP IS {ESTOP}")
     #Set up opening window
     # add assembly bench
   
@@ -195,11 +209,18 @@ def main():
     env.add(wall)
     shape._added_to_swift =True
 
+
     pattyindex = 0
     idx= 0
     while idx < len(pattylist):
-        while patty.temperature < FLIP_TEMP:
-            patty.heat(1, env)
+        while RESET:
+            print(TEACH_Q_VALS)
+            robot.CookMove(TEACH_Q_VALS)
+            env.step(0.05)
+            robot.robot.q = q  # Update the
+
+        while pattylist[pattyindex].temperature < FLIP_TEMP:
+            pattylist[pattyindex].heat(1, env)
         if not ESTOP:
             find_and_flip = robot.flip_patty(pattylist[pattyindex])
 
