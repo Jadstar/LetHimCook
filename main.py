@@ -10,6 +10,7 @@ from math import pi
 import random
 from GUI import PattyVisualizer
 from spatialmath.base import transl
+import numpy as np
 
 
 #Determines how many patties will be on grill
@@ -92,7 +93,7 @@ def configEnviro(env,pattylist: list[Patty]):
     grill_path = 'assets/krustykrab.dae'
     grill_pose = SE3(-0.2,-11.5,1.5)
     grill = geometry.Mesh(grill_path,pose=grill_pose,scale=[5,5,5])
-    #env.add(grill)
+    env.add(grill)
 
     #Adding Patties on top of grill
     # print(grill_pose.A[1,3])
@@ -121,7 +122,7 @@ def configEnviro(env,pattylist: list[Patty]):
     # add assembly bench
 
     benchPath = 'assets/workingBench.stl'
-    benchPose = SE3(-1.75, 0.6, 0) @ SE3.Rx(pi/2)
+    benchPose = SE3(-1.8, 0.4, 0) @ SE3.Rx(pi/2)
     bench = geometry.Mesh(benchPath, base=benchPose, scale=(0.0005,0.00125,0.001))
     bench.color = (0.37,0.57,0.97,1)
     env.add(bench)
@@ -178,61 +179,114 @@ def main():
 
 
     tomatoSaucePath = 'assets/tomatoSauce.stl'
-    tomatoSaucePose = SE3(-1.7, -0.3, 0.67) @ SE3.Rx(pi/2)
+    tomatoSaucePose = SE3(-1.6, -0.7, 0.67) @ SE3.Rx(pi/2)
     tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
     tomatoSauce.color = (1.0,0,0,1.0)
     env.add(tomatoSauce)
 
     platePath = 'assets/dinnerPlate.stl'
-    platePose = SE3(-1.4, -0.5, 0.7)
-    plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.001,0.001,0.001))
+    platePose = SE3(-1.4, -0.6, 0.7)
+    plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.0009,0.0009,0.0009))
     plate1.color = (1.0,1.0,1.0,1.0)
     env.add(plate1)
 
     assemblyRobot = AssemblyRobot()
-    assemblyRobot.setPose(SE3(-1.39, -1.10, 0.685))
+    assemblyRobot.setPose(SE3(-1.39, -0.97, 0.685))
     assemblyRobot.robot.add_to_env(env)
 
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)
 
     for q in assemblyQMatrix:
         assemblyRobot.robot.q = q
 
-        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        tomatoSauce.T = fkine
+        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        # tomatoSauce.T = fkine
 
         env.step(0.05)
 
-    assemblyQMatrix = assemblyRobot.move(mode='circle', t=1)
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.3,0.33,0.18], targetRPY=[pi/2,-pi/2,pi], t=1)
 
     for q in assemblyQMatrix:
         assemblyRobot.robot.q = q
 
-        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        tomatoSauce.T = fkine
+        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        # tomatoSauce.T = fkine
 
         env.step(0.05)
 
-
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.6,0.6,0.3], targetRPY=[0,pi,0], t=1)
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)
 
     for q in assemblyQMatrix:
         assemblyRobot.robot.q = q
 
-        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        tomatoSauce.T = fkine
+        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        # tomatoSauce.T = fkine
 
         env.step(0.05)
 
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.13,0.36,0.1], targetRPY=[pi/2,0,pi], t=0.5)
 
     for q in assemblyQMatrix:
         assemblyRobot.robot.q = q
 
-        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        # tomatoSauce.T = fkine
+
+        env.step(0.05)
+
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[-0.18,0.28,0.1], targetRPY=[pi/2,0,pi], t=1)
+
+    for q in assemblyQMatrix:
+        assemblyRobot.robot.q = q
+
+        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        # tomatoSauce.T = fkine
+
+        env.step(0.05)
+
+    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.0,0.36,0.2], targetRPY=[pi/2,0,pi], t=1)
+
+    for q in assemblyQMatrix:
+        assemblyRobot.robot.q = q
+
+        fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
         tomatoSauce.T = fkine
 
         env.step(0.05)
+
+    # assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.0,0.36,0.2], targetRPY=[-pi/2,pi/2,pi], t=2)
+
+    # for q in assemblyQMatrix:
+    #     assemblyRobot.robot.q = q
+
+    #     fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
+    #     tomatoSauce.T = fkine
+
+    #     env.step(0.05)
+
+    for q in np.arange(-pi/2, pi/2, pi/25):
+        assemblyRobot.robot.q[5] = q
+        fkine = assemblyRobot.robot.fkine(assemblyRobot.robot.q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
+        tomatoSauce.T = fkine
+        env.step(0.05)
+
+
+    assemblyQMatrix = assemblyRobot.move(mode='circle', t=1.5)
+
+    for q in assemblyQMatrix:
+        assemblyRobot.robot.q = q
+
+        fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
+        tomatoSauce.T = fkine
+
+        env.step(0.05)
+
+    for q in np.arange(pi/2, -pi/2, pi/25):
+        assemblyRobot.robot.q[5] = q
+        fkine = assemblyRobot.robot.fkine(assemblyRobot.robot.q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
+        tomatoSauce.T = fkine
+        env.step(0.05)
+
 
 
     input()
