@@ -1,7 +1,7 @@
 from PyQt5.QtGui import QImage, QPixmap
 from PyQt5.uic import loadUi
 from PyQt5.QtCore import Qt,QSize,pyqtSignal
-from PyQt5.QtWidgets import QGridLayout,QLabel,QListWidget,QDialog,QFileDialog,QMessageBox,QVBoxLayout,QListWidgetItem
+from PyQt5.QtWidgets import QHBoxLayout,QSlider,QPushButton,QGridLayout,QLabel,QListWidget,QDialog,QFileDialog,QMessageBox,QVBoxLayout,QListWidgetItem
 from componentimg import imagingComponents,Camera
 # from PIL.ImageQt import ImageQt
 from  detect import DetectThread,BoundaryBox
@@ -10,12 +10,16 @@ import tempfile
 import numpy as np
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtCore import Qt
+from cooking import CookingRobot
 
 class Ui_OutputDialog(QDialog):
 
     _imaging = imagingComponents
     layout = QGridLayout()
     patties_detected_signal = pyqtSignal(list)  # Signal that emits a list
+    emergency_button = pyqtSignal(bool)
+    robotlinks = pyqtSignal(list)
+    reset = pyqtSignal(bool)
 
     tempImgpath = ""                #temporary path that will be used in case photo is taken
     def __init__(self):
@@ -49,14 +53,82 @@ class Ui_OutputDialog(QDialog):
         self.ComponentValue.clicked.connect(self.return_patties)
 
         self.AddSimulatorButton.clicked.connect(self.AddToSim)
-        self.AddSimulatorButton.setEnabled(False)
-        #Elec sim portion
-        # self._new_window = MainSpace()
+        self.AddSimulatorButton.setEnabled(True)
 
+        self.estop = QPushButton("E-STOP",self)
+        self.estop.setGeometry(400,530,100,100)
+        self.estop.setStyleSheet(
+            "background-color: red;"
+            "border-radius: 50px;"  # Half of the square size for a circle
+            "color: white;"
+            "font-size: 12pt;"
+        )
+        self.estop.clicked.connect(self.EmergencyStop)
+        self.estop.setEnabled(False)
+
+        self.gobutton = QPushButton("GO",self)
+        self.gobutton.setGeometry(290,530,80,80)
+        self.gobutton.setStyleSheet(
+            "background-color: green;"
+            "border-radius: 40px;"  # Half of the square size for a circle
+            "color: white;"
+            "font-size: 12pt;"
+        )
+        self.gobutton.clicked.connect(self.RunRobot)
+
+        self.resetbutton = QPushButton("RESET",self)
+        self.resetbutton.setGeometry(150,530,60,60)
+        self.resetbutton.setStyleSheet(
+            "background-color: blue;"
+            "border-radius: 30px;"  # Half of the square size for a circle
+            "color: white;"
+            "font-size: 12pt;"
+        )
+        self.resetbutton.clicked.connect(self.Reset)
+    def Reset(self):
+        print("RESET PRESSED")
+        value = True
+        self.reset.emit(value)
+    def RunRobot(self):
+         # Create a confirmation message box
+        confirm_msg = QMessageBox()
+        confirm_msg.setIcon(QMessageBox.Question)
+        confirm_msg.setText("The Simulation Will start, Are you sure?")
+        confirm_msg.setWindowTitle("Simulation Confirmation")
+
+        confirm_msg.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+        confirm_msg.setDefaultButton(QMessageBox.No)
+
+        result = confirm_msg.exec_()
+
+        if result == QMessageBox.Yes:
+            # User confirmed, proceed with the action
+            print("GO BUTTON PRESSED")
+            self.gobutton.setText("CONFIRM?")
+            if self.gobutton.text() == "CONFIRM?":
+                value = False
+                self.emergency_button.emit(value)
+                self.reset.emit(value)
+                self.estop.setEnabled(True)
+                self.gobutton.setEnabled(False)
+                self.gobutton.setText("GO")
+                self.AddSimulatorButton.setEnabled(False)
+                self.resetbutton.setEnabled(False)
+    def EmergencyStop(self):
+        print("EMERGENCY STOP PRESSED - STOPPING ROBOT")
+        value = True
+        reset = False
+        self.emergency_button.emit(value)
+        self.reset.emit(reset)
+        self.estop.setEnabled(False)
+        self.gobutton.setEnabled(True)
+        self.AddSimulatorButton.setEnabled(True)
+        self.resetbutton.setEnabled(True)  
 
     def return_patties(self):
         cropped_imgs = self.detect_thread.getCroppedImgs()
         self.patties_detected_signal.emit(cropped_imgs)  # Emit the signal with the cropped images
+        
         self.close()  # Close the dialog
     def show_available_webcams(self):
         '''
@@ -121,24 +193,67 @@ class Ui_OutputDialog(QDialog):
     @pyqtSlot()
     def AddToSim(self):
         '''
-        Takes current component and add it into the electrical simulation interface
+        Opens the 'teach' menu interface of the robots 
         '''
 
-        print("Adding to simulation")
+        print("Opening Menu")
+        # Create a new QDialog for the popup
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Fetch Robot Teach Module")
 
-        # #getting resistor data
-        # value = self.Value.text()
-        # tolerance = self.ToleranceValue.text()
-        # resistor =  ElecC.Resistor((30,30),value)
+        fetch = CookingRobot()
+        num_sliders = fetch.getRobotLinks()
+        camera_sliders = len(fetch.getCameraLinks())
 
-        # # Adding the new resistor to the list of components
-        # self._new_window.components.append(resistor)
+        # Create a layout for the dialog
+        layout = QVBoxLayout()
 
-        # # Adding all components to the new window
-        # for component in self._new_window.components:
-        #     self._new_window.AddComponent(component)
-        # #Opening simulation window
-        # self._new_window.show()
+        sliders = []  # List to store sliders
+        slider_labels = []  # List to store labels displaying slider values
+
+        for i, link in enumerate(num_sliders):
+            # Create a horizontal layout for each slider and its label
+            slider_layout = QHBoxLayout()
+
+            # Create a slider
+            slider = QSlider(Qt.Horizontal)
+            slider.setMinimum(0)
+            slider.setMaximum(100)
+            sliders.append(slider)
+
+            # Create a label displaying the slider's current value
+            value_label = QLabel(f"{slider.value()}")  # Display the initial value
+
+            slider.valueChanged.connect(lambda value, label=value_label, qlim=link.qlim: label.setText(str(qlim[0] + value * (qlim[1] - qlim[0]) / 100)))  # Update label when value changes
+            slider.valueChanged.connect(lambda value, i=i, qlim=link.qlim: self.robotlinks.emit(self.handle_slider_value_changed(value,qlim,i)))  # Update label when value changes
+            # Set the slider's name to the link's name
+            slider_name_label = QLabel(link.name)
+
+            # Add the slider and labels to the slider_layout
+            slider_layout.addWidget(slider_name_label)
+            slider_layout.addWidget(slider)
+            slider_layout.addWidget(value_label)
+
+            # Add the slider_layout to the main layout
+            layout.addLayout(slider_layout)
+
+        # Create a button to close the dialog
+        close_button = QPushButton("Close")
+        close_button.clicked.connect(dialog.accept)
+        layout.addWidget(close_button)
+
+        dialog.setLayout(layout)
+
+        # Show the popup dialog
+        dialog.exec_()
+
+    def handle_slider_value_changed(self, value, qlim, index):
+        # Calculate the value in the original range
+        original_value = qlim[0] + value * (qlim[1] - qlim[0]) / 100
+        linkvalue =[original_value,index]
+        # Emit the custom signal with a list of floats
+        # print(linkvalue)
+        self.robotlinks.emit(linkvalue)
 
     def update_progress(self, percent_complete):
         '''

@@ -1,13 +1,7 @@
 {
-	"folders": [
-		{
-			"name": "LetHimCook",
-			"path": "."
-		},
-		{
-			"name": ".venv",
-			"path": "../Industrial-Robotics/.venv"
-		}
-	],
-	"settings": {}
+    "folders": [
+        {
+            "path": "."
+        }
+    ]
 }

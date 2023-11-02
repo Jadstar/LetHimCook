@@ -4,12 +4,9 @@ from PyQt5.uic import loadUi
 from PyQt5 import QtWidgets
 from PyQt5.QtCore import pyqtSlot
 from PyQt5.QtWidgets import QApplication, QDialog
-# import resource
-# from model import Model
 from out_window import Ui_OutputDialog
 import time
 from cooking import CookingRobot,Patty, FLIP_TEMP, DONE_TEMP, TIME_STEP
-from assembly import AssemblyRobot
 import spatialgeometry as geometry
 from PyQt5.QtWidgets import QApplication
 from spatialmath import SE3
@@ -19,10 +16,23 @@ import random
 from GUI import PattyVisualizer
 import roboticstoolbox as rtb
 from spatialgeometry import Cuboid
-import detect
-import mainwindow
-NUM_OF_PATTIES = 4
+from spatialmath.base import transl
+import numpy as np
+from assembly import AssemblyRobot
+
+# import mainwindow
+
+NUM_OF_PATTIES = 4      #Default No of Patties
+FLOOR_LVL = 0           #Where the floor starts (z axis) on the swift env
+ESTOP = False
+RESET = True
+PICKUP_THRESHOLD = 0.05
+TEACH_Q_VALS= [0,0,0,0,0,0,0,0,0,0]
 class Ui_Dialog(QDialog):
+    '''
+    THIS IS THE CLASS TO RUN THE GUI OPENING TO THE ROBOT
+    WHEN RUN, A MENU WILL OPEN WHICH WILL ALLOW USERS TO SCAN PATTIES INTO THE SWIFT ENVIRONMENT
+    '''
     def __init__(self):
         super(Ui_Dialog, self).__init__()
         loadUi("mainwindow.ui", self)
@@ -46,110 +56,62 @@ class Ui_Dialog(QDialog):
         print("Clicked Run")
         self.refreshAll()
         self.hide()  # hide the main window
+        
+        self.robotrun = threading.Thread(target=main)
+        # robotrun.start()
         self.outputWindow_()  # Create and open new output window
+
+        # robotrun.join()
 
     def outputWindow_(self):
         """
         Created new window for vidual output of the video in GUI
         """
         self._new_window = Ui_OutputDialog()
-        self._new_window.patties_detected_signal.connect(self.handle_cropped_imgs)
-
+        self._new_window.patties_detected_signal.connect(self.uploadScannedPatties)
+        self._new_window.emergency_button.connect(self.startstop)
+        self._new_window.robotlinks.connect(self.getTeachModelChanges)
+        self._new_window.reset.connect(self.resetRobot)
         self._new_window.show()
-    def handle_cropped_imgs(self, cropped_imgs):
+    def uploadScannedPatties(self, cropped_imgs):
         global NUM_OF_PATTIES
         NUM_OF_PATTIES = len(cropped_imgs)
         print(f"Detected {NUM_OF_PATTIES} patties.")  # This will print the number of patties
-        # self._new_window.startVideo(self.Videocapture_)
-        # print("Video Played")
-#Sensor mode will use real picture to determine how many patties enter 
+
+    def getTeachModelChanges(self,linkvalue):
+        global TEACH_Q_VALS
+        TEACH_Q_VALS[linkvalue[1]] = linkvalue[0]
+        # print(TEACH_Q_VALS)
+        
+    def resetRobot(self,value):
+        global RESET
+        global TEACH_Q_VALS
+        RESET = value
+        TEACH_Q_VALS = [0,0,0,0,0,0,0,0,0,0]
+    def startstop(self,value):
+        global ESTOP
+        ESTOP = value
+        print("ESTOP")
+        print(ESTOP)
+        if ESTOP == False:
+            try:
+                # If robot hasnt started, start it
+                self.robotrun.start()
+            except:
+                pass
+
+        # self.robotrun.join()
 
 
-    # You can add any further processing code here
-Image_check = '' # impage to check
-
-# Run detect Code
-# Get output of detect code 
-
-#For length of detect code, add that many patties
-
-#if you can do it, extract the x,y coords of the boxes, 
-# find the center, and then thats ur center of ur patty
-#then u can do the dist between patties to show how the poses work
-
-
-
-#Determines how many patties will be on grill
 
 #Where the floor starts (z axis) on the swift env
 FLOOR_LVL = 0
 
-def testpatty(patty, window, env):
+platePose = SE3(1,1,0.5)
+plate_translation = platePose.A[:3, 3]  # Get the translation from the 4x4 matrix
+print(f"Plate Location: x={plate_translation[0]}, y={plate_translation[1]}, z={plate_translation[2]}")
     
-    while True:
-        # If emergency stop is not requested, continue cooking
-        while not window.emergency_stop_requested and patty.temperature < DONE_TEMP:
-            patty.heat(1)  # Increase temperature by 1 degree for testing
-            print(f"Current Patty Temperature: {patty.temperature}°C")
-            window.update_display(patty.temperature)
-            time.sleep(0.2)
-
-        # If the patty is done cooking, break out of the loop
-        if patty.temperature >= DONE_TEMP:
-            break
-
-        # If emergency stop is requested, pause and wait for it to be unset
-        while window.emergency_stop_requested:
-            time.sleep(0.5)
-            
-def movingIntotest():
-    env = swift.Swift()
-    env.launch(realtime=True)
-
-    #Generate a number of Patties on Grill
-    pattylist = []
-    for i in range(NUM_OF_PATTIES):
-        patty = Patty()
-        pattylist.append(patty)
-
-    #Config Environment
-    configEnviro(env,pattylist)
-
-    # Load the robot and cooking items
-    robot = CookingRobot()
-    robot.setPose(SE3(-20,-12,FLOOR_LVL))
-    robot.CookMove(robot.robot.qr )
-    robot.AddtoEnv(env)
-
-    #Robot
-    move_forward =SE3(0,-12,0)
-    move1 = robot.moveToPos(move_forward)
-    q1 = robot.robot.q
-    qtraj = rtb.ctraj(robot.getPose(),move_forward,t=50)
-    input()
-    for q in qtraj:
-        print(q)
-        robot.setPose(q)
-        env.step(0.05)
-        # time.sleep(1)
-    secondmove = SE3(0,-8,0) * SE3.Rz(pi/2)
-    qtraj = rtb.ctraj(robot.getPose(),secondmove,t=50)
     
-
-    for q in qtraj:
-            print(q)
-            robot.setPose(q)
-            env.step(0.05)
-    thirdmove =SE3(1.1,10,0)* SE3.Rz(pi/2)
-    qtraj = rtb.ctraj(robot.getPose(),thirdmove,t=50)
-    input()
-
-    for q in qtraj:
-            print(q)
-            robot.setPose(q)
-            env.step(0.1)
-    env.hold()
-
 def configEnviro(env,pattylist: list[Patty]):
     '''
     Implementing all environmental components in the env
@@ -168,8 +130,7 @@ def configEnviro(env,pattylist: list[Patty]):
     patty_y_bounds = [0.8,1.25 ]
     patty_z = 0.55
 
-    # Number of patties to create
-
+    # Create the bounds of the grill and have the patties pose be moved there
     x_step = 0.22
     y_step = 0.22
 
@@ -184,126 +145,187 @@ def configEnviro(env,pattylist: list[Patty]):
         patty.setPose(SE3(current_x, current_y, patty_z))
         patty.AddtoEnv(env)
         current_x += x_step
+    
+ 
 
-    # add assembly bench
-
-    # benchPath = 'assets/workingBench.stl'
-    # benchPose = SE3(-1.5,2,0)*SE3.Rx(pi/2)
-    # bench = geometry.Mesh(benchPath, pose=benchPose, scale=[0.0005,0.0012,0.001])
-    # # bench.color = (0.8,0.2,0.5,1)
-    # env.add(bench)
-
-    # platePath = 'assets/dinnerPlate.stl'
-    # platePose = SE3(0,0,0)*SE3.Rx(pi/2)
-    # plate1 = geometry.Mesh(platePath, pose=platePose, scale=[1,1,1])
-    # plate1.color = (1,1,1,1)
-    # env.add(plate1)
-
-
-
-def testpatty(robot):
-    # Test heating the patty and visualizing the color change
-    while robot.patty.temperature < DONE_TEMP:
-        robot.patty.heat(1)  # Increase temperature by 1 degree for testing
-        print(f"Current Patty Temperature: {robot.patty.temperature}°C")  # Print the current temperature
-        time.sleep(0.2)
 
 def main():
+    global ESTOP
+    global TEACH_Q_VALS
+    # print(f"ESTOP IS {ESTOP}")
+    #Set up opening window
+    # add assembly bench
+  
     # Initialize the simulation environment
-    
-    app = QApplication(mainwindow.sys.argv)
-    ui = Ui_Dialog()
-    ui.show()
-    # sys.exit(app.exec_())
-    app.exec_()  # This will block until Ui_Dialog is closed
-
     env = swift.Swift()
     env.launch(realtime=True)
     
-    # patty = Patty(env=env)
-    # patty.setPose(SE3(2, 1, 1))
-    # patty.AddtoEnv(env)
+
+    tomatoSaucePath = 'assets/tomatoSauce.stl'
+    # tomatoSaucePose = SE3(0.79, -0.8, 0.67) @ SE3.Rx(pi/2)
+    tomatoSaucePose = SE3(1.2, 1, 0.5) @ SE3.Rx(pi/2)
+    tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
+    tomatoSauce.color = (1.0,0,0,1.0)
+    env.add(tomatoSauce)
+    
+    # Adding plate
+    platePath = 'assets/dinnerPlate.stl'
+    plate1 = geometry.Mesh(platePath, pose=platePose, scale=[0.001,0.001,0.001])
+    # plate1.color = (1,1,1,1)
+    env.add(plate1)
+
       #Generate a number of Patties on Grill
     pattylist = []
     for i in range(NUM_OF_PATTIES):
         patty = Patty()
         pattylist.append(patty)
-            
-    # Initialize the GUI for Patty Visualization
-    # app = QApplication([])
-    # window = PattyVisualizer()
-    # window.show()
-
-    # app.exec_()  
 
     #Config Environment
     configEnviro(env,pattylist)
-    print('configged enviro')
-    # Load the robot and cooking items
-    robot = CookingRobot()
-    # robot.setPose(SE3(1.2,11.5,FLOOR_LVL) *SE3.Rz(-pi/2))
-    robot.robot.q = robot.robot.qr  # Update the robot's internal state to reflect its current pose
-    print("++++++++++++++++++")
-    print(robot.robot.fkine(robot.robot.qr).A[:3, 3])
-    print(robot.robot.fkine(robot.robot.q).A[:3, 3])
-    print("++++++++++++++++++")
-    robot.CookMove(robot.robot.qr)
-    # assemblyRobot = AssemblyRobot()
-    # assemblyRobot.setPose(SE3(-1.25, 10.3, 0.685))
-    # assemblyRobot.robot.add_to_env(env)
-    # assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
-    robot.AddtoEnv(env)
-    # input('ready to flip')
+    print('Environment Configured')
     
+    # Load the Cooking Robot
+    robot = CookingRobot()
+    robot.robot.q = robot.robot.qr  # Update the robot's internal state to reflect its current pose
+
+    # print("++++++++++++++++++")
+    # print(robot.robot.fkine(robot.robot.qr).A[:3, 3])
+    # print(robot.robot.fkine(robot.robot.q).A[:3, 3])
+    # print("++++++++++++++++++")
+
+    robot.CookMove(robot.robot.qr)
+    robot.AddtoEnv(env)
+
+    assemblyRobot = AssemblyRobot()
+    assemblyRobot.setPose(SE3(0.8, 0.3, 0.4))
+    assemblyRobot.robot.add_to_env(env)
+  
+    shape = Cuboid(scale=[1,0.5,0.5])
+    wall = Cuboid(scale=[20,9.85,10])
+    wall.T = SE3(0.275,6.25,0)
+    # print(shape.to_dict())
+    shape.T = SE3(0.25,1.075,0.275)
+    env.add(shape)
+    env.add(wall)
+    shape._added_to_swift =True
+
+
+    pattyindex = 0
+    idx= 0
+    while idx < len(pattylist):
+        while RESET:
+            print(TEACH_Q_VALS)
+            robot.CookMove(TEACH_Q_VALS)
+            env.step(0.05)
+            robot.robot.q = q  # Update the
+
+        while pattylist[pattyindex].temperature < FLIP_TEMP:
+            pattylist[pattyindex].heat(1, env)
+        if not ESTOP:
+            find_and_flip = robot.flip_patty(pattylist[pattyindex])
+
+            for i, q in enumerate(find_and_flip[0]):
+                if not ESTOP:
+                    robot.CookMove(q)
+                    env.step(0.06)
+                    robot.robot.q = q  # Update the robot's current configuration
+
+            for i, q in enumerate(find_and_flip[1]):
+                if not ESTOP:
+                    robot.CookMove(q)
+                    tr = robot.robot.fkine(q).A
+                    # diff = np.linalg.norm(pattylist[pattyindex].getPose() - tr)
+                    # if diff <= PICKUP_THRESHOLD:
+                    pattylist[pattyindex].setPose(tr * robot.flipoffset)
+                    env.step(0.06)
+
+            for s in robot.PattyGravity(pattylist[pattyindex]):
+                if not ESTOP:
+                    pattylist[pattyindex].setPose(s)
+                    env.step(0.01)
+
+            pattyindex += 1
+
+            idx += 1
+
+    env.hold()
+
     for patty in pattylist:
-        while patty.temperature < FLIP_TEMP:
+        while patty.temperature < DONE_TEMP:
             patty.heat(1, env)
-            time.sleep(0.05)
-            print(patty.temperature) # COLOUR CHANGING BROKEN
+            # time.sleep(5)
         # input('ready for next')
         # First part of array finds patty, second part flips
-        
         # Check for Collisions 
-        find_and_flip = robot.flip_patty(patty)
-        # shape = Cuboid(scale=[0.74,0.55,0.45],color=[0.1,0.1,0.1,0])
-        # print(shape.to_dict())
-        # shape.T = SE3(0.25,1.025,0.275)
-        # env.add(shape)
-        # # shape._added_to_swift =True
-        # print(f"THIS IS THE SHAPE: {shape.fk_dict()}")
-        # print(robot.robot.links[0].closest_point(shape)[0])
-        # link0dist = robot.robot.links[2].closest_point(shape)[0]
-        # if link0dist == None:
-        #     link0dist = 0
-        # while robot.robot.collided(shape=shape,q=find_and_flip,skip=True) and link0dist < 0.1:
-        #     print("Collided With thing")
-        #     find_and_flip = robot.flip_patty(patty)
-        #     for i in robot.robot.links[2:]:
-        #         print(i.closest_point(shape)[0])
-        #         link0dist = robot.robot.links[0].closest_point(shape)[0]
-        #         if link0dist == None:
-        #             link0dist = 0
+        find_and_flip = robot.move_to_plate(patty, platePose)
+        
         print("++++++++++++++++++")
         print(robot.robot.fkine(robot.robot.q).A[:3, 3])
         print("++++++++++++++++++")
         for q in find_and_flip[0]:
-             robot.CookMove(q)
-             env.step(0.06)
-             robot.robot.q = q  # Update the robot's current configuration to the last configuration in the trajectory
+            robot.CookMove(q)
+            env.step(0.06)
+            robot.robot.q = q
 
+
+        # Perform the flipping action at the plate
         for q in find_and_flip[1]:
             robot.CookMove(q)
             tr = robot.robot.fkine(q).A
             patty.setPose(tr * robot.flipoffset)
             env.step(0.06)
+
+        # Apply gravity effect to the patty if needed
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
             env.step(0.01)
-        
-    # Test the patty color change
+
+        assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+        for q in assemblyQMatrix:
+            assemblyRobot.robot.q = q
+
+            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+            tomatoSauce.T = fkine
+
+            env.step(0.05)
+
+        assemblyQMatrix = assemblyRobot.move(mode='circle', t=1)
+
+        for q in assemblyQMatrix:
+            assemblyRobot.robot.q = q
+
+            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+            tomatoSauce.T = fkine
+
+            env.step(0.05)
+
+
+        assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.6,0.6,0.3], targetRPY=[0,pi,0], t=1)
+
+        for q in assemblyQMatrix:
+            assemblyRobot.robot.q = q
+
+            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+            tomatoSauce.T = fkine
+
+            env.step(0.05)
+
+        # assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+
+        # for q in assemblyQMatrix:
+        #     assemblyRobot.robot.q = q
+
+        #     fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        #     tomatoSauce.T = fkine
+
+        #     env.step(0.05)
     env.hold()
-    sys.exit(app.exec_())
+    # sys.exit(app.exec_())
 
 if __name__ == "__main__":
-    
-    main()
+    app = QApplication(sys.argv)
+    ui = Ui_Dialog()
+    ui.show()
+    app.exec_()  # This will block until Ui_Dialog is closed
+    ui.robotrun.join()
+    # main()
