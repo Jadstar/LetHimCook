@@ -18,11 +18,13 @@ import random
 from GUI import PattyVisualizer
 import roboticstoolbox as rtb
 from spatialgeometry import Cuboid
+import numpy as np
 # import mainwindow
 
 NUM_OF_PATTIES = 4      #Default No of Patties
 FLOOR_LVL = 0           #Where the floor starts (z axis) on the swift env
 ESTOP = False
+PICKUP_THRESHOLD = 0.05
 class Ui_Dialog(QDialog):
     '''
     THIS IS THE CLASS TO RUN THE GUI OPENING TO THE ROBOT
@@ -123,7 +125,8 @@ def configEnviro(env,pattylist: list[Patty]):
         current_x += x_step
 
 def main():
-    
+    global ESTOP
+    print(f"ESTOP IS {ESTOP}")
     #Set up opening window
 
     # Initialize the simulation environment
@@ -148,10 +151,10 @@ def main():
     robot = CookingRobot()
     robot.robot.q = robot.robot.qr  # Update the robot's internal state to reflect its current pose
 
-    print("++++++++++++++++++")
-    print(robot.robot.fkine(robot.robot.qr).A[:3, 3])
-    print(robot.robot.fkine(robot.robot.q).A[:3, 3])
-    print("++++++++++++++++++")
+    # print("++++++++++++++++++")
+    # print(robot.robot.fkine(robot.robot.qr).A[:3, 3])
+    # print(robot.robot.fkine(robot.robot.q).A[:3, 3])
+    # print("++++++++++++++++++")
 
     robot.CookMove(robot.robot.qr)
     robot.AddtoEnv(env)
@@ -162,95 +165,36 @@ def main():
     # assemblyRobot.robot.q = [0,-pi/2,pi/4,0,0,0]
     # input('ready to flip')
     pattyindex = 0
-    jointindex = 0
-    findorflip_index = -1 # 0 if estopped in find, 1 if stopped in flip
-    ESTOP_saved_index = [pattyindex,jointindex,findorflip_index]  #we use this to store the index to know where the estop stopped at
-    for idx,patty in enumerate(pattylist):
+    idx= 0
+    while idx < len(pattylist):
+        if not ESTOP:
+            find_and_flip = robot.flip_patty(pattylist[pattyindex])
 
-        
-        #TODO: Fix Temperature Patty
-        # while patty.temperature < FLIP_TEMP:
-        #     patty.heat(1, env)
-        #     time.sleep(0.05)
-        #     print(patty.temperature) # COLOUR CHANGING BROKEN
+            for i, q in enumerate(find_and_flip[0]):
+                if not ESTOP:
+                    robot.CookMove(q)
+                    env.step(0.06)
+                    robot.robot.q = q  # Update the robot's current configuration
 
+            for i, q in enumerate(find_and_flip[1]):
+                if not ESTOP:
+                    robot.CookMove(q)
+                    tr = robot.robot.fkine(q).A
+                    # diff = np.linalg.norm(pattylist[pattyindex].getPose() - tr)
+                    # if diff <= PICKUP_THRESHOLD:
+                    pattylist[pattyindex].setPose(tr * robot.flipoffset)
+                    env.step(0.06)
 
-  
+            for s in robot.PattyGravity(pattylist[pattyindex]):
+                if not ESTOP:
+                    pattylist[pattyindex].setPose(s)
+                    env.step(0.01)
 
-        # Check for Collisions 
+            pattyindex += 1
 
-        # shape = Cuboid(scale=[0.74,0.55,0.45],color=[0.1,0.1,0.1,0])
-        # print(shape.to_dict())
-        # shape.T = SE3(0.25,1.025,0.275)
-        # env.add(shape)
-        # # shape._added_to_swift =True
-        # print(f"THIS IS THE SHAPE: {shape.fk_dict()}")
-        # print(robot.robot.links[0].closest_point(shape)[0])
-        # link0dist = robot.robot.links[2].closest_point(shape)[0]
-        # if link0dist == None:
-        #     link0dist = 0
-        # while robot.robot.collided(shape=shape,q=find_and_flip,skip=True) and link0dist < 0.1:
-        #     print("Collided With thing")
-        #     find_and_flip = robot.flip_patty(patty)
-        #     for i in robot.robot.links[2:]:
-        #         print(i.closest_point(shape)[0])
-        #         link0dist = robot.robot.links[0].closest_point(shape)[0]
-        #         if link0dist == None:
-        #             link0dist = 0
+            idx += 1
 
-        print("++++++++++++++++++")
-        print(robot.robot.fkine(robot.robot.q).A[:3, 3])
-        print("++++++++++++++++++")
-
-        #Checking if The estop was previously pressed
-        tempFindidx = 0
-        tempFlipidx = 0
-        find_and_flip = robot.flip_patty(pattylist[pattyindex])
-
-        if ESTOP_saved_index[2] != -1:
-                  # First part of array finds patty, second part flips
-            # start = time.time()
-            # end = time.time()
-            # elasped = end - start
-            # print(f"Execution time: {elasped} seconds")
-
-            findorflip_index = -1
-            if ESTOP_saved_index[2] == 0:
-                tempFindidx = jointindex
-            else:
-                tempFlipidx = 0
-
-        for i,q in enumerate(find_and_flip[0][tempFindidx]):
-            if ESTOP == False:
-                robot.CookMove(q)
-                env.step(0.06)
-                robot.robot.q = q  # Update the robot's current configuration to the last configuration in the trajectory
-            elif i > 0:
-                # If estop is pressed, we save the index that it was about to do 
-                findorflip_index = 0
-                jointindex = find_and_flip[findorflip_index][i]
-                pattyindex = idx
-
-        for i,q in enumerate(find_and_flip[1][tempFlipidx]):
-            if ESTOP == False:
-                robot.CookMove(q)
-                tr = robot.robot.fkine(q).A
-                patty.setPose(tr * robot.flipoffset)
-                env.step(0.06)
-            elif i > 0 and findorflip_index != 0:
-                # If estop is pressed, we save the index that it was about to do 
-                findorflip_index = 1
-                jointindex = find_and_flip[findorflip_index][i]
-                pattyindex = idx
-
-        for s in robot.PattyGravity(patty):
-            patty.setPose(s)
-            env.step(0.01)
-
-        # IF E-STOP HAS BEEN PRESSED WE MUST START FROM SAME INDEX UNTIL ITS UNPRESSED
-        ESTOP_saved_index =[pattyindex,jointindex,findorflip_index] 
     env.hold()
-
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     ui = Ui_Dialog()
