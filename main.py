@@ -147,7 +147,8 @@ def main():
     env = swift.Swift()
     env.launch(realtime=True)
     tomatoSaucePath = 'assets/tomatoSauce.stl'
-    tomatoSaucePose = SE3(0.79, -0.8, 0.67) @ SE3.Rx(pi/2)
+    # tomatoSaucePose = SE3(0.79, -0.8, 0.67) @ SE3.Rx(pi/2)
+    tomatoSaucePose = SE3(1.2, 1, 0.5) @ SE3.Rx(pi/2)
     tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
     tomatoSauce.color = (1.0,0,0,1.0)
     env.add(tomatoSauce)
@@ -179,7 +180,7 @@ def main():
     print("++++++++++++++++++")
     robot.CookMove(robot.robot.qr)
     assemblyRobot = AssemblyRobot()
-    assemblyRobot.setPose(SE3(1, 0, 0))
+    assemblyRobot.setPose(SE3(0.8, 0.3, 0.4))
     assemblyRobot.robot.add_to_env(env)
     
     robot.AddtoEnv(env)
@@ -205,7 +206,6 @@ def main():
         print("++++++++++++++++++")
         for q in find_and_flip[0]:
              robot.CookMove(q)
-             print("BELOWER")
             #  print(env.swift_objects)
              env.step(0.06)
              robot.robot.q = q  # Update the robot's current configuration to the last configuration in the trajectory
@@ -278,15 +278,15 @@ def main():
 
             env.step(0.05)
 
-        assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
+        # assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
 
-        for q in assemblyQMatrix:
-            assemblyRobot.robot.q = q
+        # for q in assemblyQMatrix:
+        #     assemblyRobot.robot.q = q
 
-            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-            tomatoSauce.T = fkine
+        #     fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
+        #     tomatoSauce.T = fkine
 
-            env.step(0.05)
+        #     env.step(0.05)
     env.hold()
     # sys.exit(app.exec_())
 
