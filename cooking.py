@@ -75,41 +75,48 @@ class Patty:
         
         Returns: A tuple representing the RGB color.
         '''
-        # Use linear interpolation to transition from pink (uncooked) to brown (cooked)
-        # based on the temperature relative to the flipping and done temperatures.
-        if temp < FLIP_TEMP:
-            fraction_cooked = (temp - ROOM_TEMP) / (FLIP_TEMP - ROOM_TEMP)
-        else:
-            fraction_cooked = 1 + (temp - FLIP_TEMP) / (DONE_TEMP - FLIP_TEMP)
-        
         # Pink color
         pink = np.array([255, 182, 193])
         # Brown color
         brown = np.array([139, 69, 19])
 
+        if temp <= DONE_TEMP:
+            # Interpolate from room temperature to flip temperature
+            fraction_cooked = (temp - ROOM_TEMP) / (DONE_TEMP - ROOM_TEMP)
+        else:
+        # If the temperature is beyond done temperature, the patty is brown
+            fraction_cooked = 1
         # Interpolate between pink and brown
-        color = pink + fraction_cooked * (brown - pink)
+        color = pink * (1 - fraction_cooked) + brown * fraction_cooked
+        print(color)
         clamped_color = np.clip(color, 0, 255)
-
+        print(clamped_color)
         # Return as a tuple normalized to [0, 1]
-        return tuple(clamped_color / 255.0)
+        return tuple(clamped_color)
 
     def update_color(self, env):
         '''
         Updates the color of the patty mesh in the environment based on its temperature.
         '''
+        
+        
+        # print(env.swift_objects[3])
+        env.remove(self.mesh)
         # Calculate the new color based on temperature
         new_color = self.get_color(self.temperature)
-        # self.mesh.color = new_color
-        env.step(0.2)
+        # self.mesh.color = newes_color
+        # env._step_shape(self.mesh,0.2)
         # # Re-add the patty to the environment to force a visual update
-        # newpatty = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.mesh.T), scale=self.scale, color=new_color)
-        # # newpatty.attach_to(self.mesh)
-        # env.add(newpatty)
-        # self.mesh =self.mesh
+        newpatty = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.mesh.T), scale=self.scale, color=new_color)
+        oldmesh = self.mesh
+        self.mesh = newpatty
+        env.add(self.mesh)
+        
+
         
 
 class CookingRobot:
+
     '''
     This class combines the components that will make up the Fetch Robot Including:
 
@@ -125,12 +132,18 @@ class CookingRobot:
         self.camera = FetchCamera()
         spatula_mount_path = 'fetch_robotdata/accessories/SpatulaMount.STL'
         spatula_path = 'fetch_robotdata/accessories/Spatula.stl'
-
+        self.boundary = CollisionBoundary(x_bounds=[-0.275,0.725], y_bounds=[0.725,1.225], z_bounds=[0,0.5])
+        # self.wallbound = CollisionBoundary(x_bounds=[-9.75,10.25], y_bounds=[1.4,11.25], z_bounds=[-5,5])
+        # self.boundary = CollisionBoundary(x_bounds=[0,0], y_bounds=[0,0], z_bounds=[0,0])
+        self.wallbound = CollisionBoundary(x_bounds=[0,0], y_bounds=[0,0], z_bounds=[0,0])
         #Moving Spatula to correct place
         self.spatula_offset = SE3(0,0,-0.07)
+        self.negspatula_offset = SE3(0,0,0.07)
         self.mount_offset = SE3(-0.085,0,0)
+        self.negmount_offset = SE3(-0.085,0,0)
         #The offset to make sure the end effector is the spatula, not gripper
         self.patty_offset = SE3(-0.13,0,0.065)
+        self.negpatty_offset = SE3(-0.13,0,-0.065)
         self.flipoffset = SE3(0.13,0,-0.05)    #So when flipping, the patty stays on the spatula
 
         spatula_pose = self.robot.fkine(self.robot.q).A * SE3.Rz(pi/2) * self.spatula_offset
@@ -318,27 +331,34 @@ class CookingRobot:
         calculated_position = robot.fkine(q).A[:3, 3]
         return np.linalg.norm(calculated_position - np.array([offset_location[0, 3], offset_location[1, 3], offset_location[2, 3]]))
 
-    def check_trajectory_collision(self, robot, trajectory, boundary):
-            '''
-            Checks if any configuration in the trajectory causes a collision.
+    def check_trajectory_collision(self, trajectory, boundary):
+        '''
+        Checks if any configuration in the trajectory causes a collision.
+        
+        robot: The robot object.
+        trajectory: List of joint configurations.
+        boundary: CollisionBoundary object.
+        
+        Returns True if collision is detected, False otherwise.
+        '''
+        # print("Trajectory:")
+        for q in reversed(trajectory):
+            # print(f"Configuration {idx}: {q}")
+            # Convert the first two joint values from polar to Cartesian coordinates
+            base_x, base_y = polar_to_cartesian(q[0], q[1])
             
-            robot: The robot object.
-            trajectory: List of joint configurations.
-            boundary: CollisionBoundary object.
-            
-            Returns True if collision is detected, False otherwise.
-            '''
-            for q in trajectory:
-                # Convert the joint configuration to its Cartesian coordinate
-                poses = self.robot.fkine_all(q).A
-                for pose in poses:
-                    position = (pose[0, 3], pose[1, 3], pose[2, 3])
-                    
-                    # Check for collisions with the boundary
-                    if boundary.check_collision(position):
-                        return True
-            return False
-    
+            # Convert the joint configuration to its Cartesian coordinate
+            poses = self.robot.fkine_all(q).A
+            for joint_idx, pose in enumerate(poses):
+                # Convert local pose to global pose by adding base position
+                position = (pose[0, 3] + base_x, pose[1, 3] + base_y, pose[2, 3])
+                # print(f"Joint {joint_idx}: Position {position}")
+                # Check for collisions with the boundary
+                if boundary.check_collision(position):
+                    return True
+                        
+        return False
+                
     def flip_patty(self, patty):
         '''
         Creates a list of joint values to move the spatula to the patty and flip it over.
@@ -360,16 +380,17 @@ class CookingRobot:
 
         q0=[1.62, -2.166, 0.08587, -0.4418, 0.007674, -0.5102, 0.1855, 1.453, -0.2802, -0.9157]
         q=[0.9065, 1.229, 0.2164, -0.8978, -0.08897, -0.03925, -0.008564, -0.05373, 0.09794, 0.09256]
-        max_attempts = 100000  # Maximum number of attempts to find a valid IK solution.
+        max_attempts = 500  # Maximum number of attempts to find a valid IK solution.
         attempts = 0
         mindist = 10000
         mindist2 = 10000
         q1_successful = False
         q2_successful = False
-        boundary = CollisionBoundary(x_bounds=[-0.12,0.62], y_bounds=[0.7,1.25], z_bounds=[0,0.54])
-
+        # 10,5.55,0.45
+        # 0.25,6.025,0.275
+        
         while attempts < max_attempts:
-            q1 = self.robot.ikine_LM(offset_location, mask=[0.5,0.5,1,1,1,1])
+            q1 = self.robot.ikine_LM(offset_location)
             qtraj_to_patty = rtb.jtraj(self.robot.q, q1.q, 50).q
             for qt in qtraj_to_patty:
                 f1 = self.robot.fkine_all(qt)
@@ -384,98 +405,159 @@ class CookingRobot:
             print(q1)
             print("ATTEMPTING++++++++++++++++++++")
             print(attempts)
-
-            if not self.check_trajectory_collision(self.robot, qtraj_to_patty, boundary):
-                q1_successful = True
-            if q1_successful:
-                if mindist > self.calculate_distance(self.robot, q1.q, offset_location):
-                    q0=q1.q
-                    mindist = self.calculate_distance(self.robot, q1.q, offset_location)
-                if q1.success and self.calculate_distance(self.robot, q1.q, offset_location) <= 0.01:
-                    break
-                attempts += 1
+            attempts += 1
             print(q1.q)
-        
-       
-        if q1.success:
-            full_qlist.append(qtraj_to_patty)
-            print(f"Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
+            if (not self.check_trajectory_collision(qtraj_to_patty, self.boundary)) and (not self.check_trajectory_collision(qtraj_to_patty, self.wallbound)) and (q1.success) and (self.calculate_distance(self.robot, q1.q, offset_location)< 0.1):
+                q1_successful = True
+                print('passseeeed wtihhhhhhhhh ', q1.success)
+                full_qlist.append(qtraj_to_patty)
+                print(f"Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
+                break
+            
 
         # 3. Flip Patty
         flip_loc = offset_location * SE3.Rx(pi)
         attempts = 0
         q0 = q1.q
         while attempts < max_attempts:
-            q2 = self.robot.ikine_LM(flip_loc,q0=q0, mask=[0.5,0.5,1,1,1,1])
+            q2 = self.robot.ikine_LM(flip_loc)
             
             # Convert joint values to Cartesian coordinates
             print("===================^")
             print(f"tried 2 Moving to Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
             print('===but 2 distance===')
             print(self.calculate_distance(self.robot, q2.q, flip_loc))
-            print(q1)
+            print(q2)
 
             qtraj_to_patty = rtb.jtraj(q1.q, q2.q, 50).q
-            if not self.check_trajectory_collision(self.robot, qtraj_to_patty, boundary):
-                q2_successful = True
-            if q2_successful:
-                if mindist2 > self.calculate_distance(self.robot, q2.q, flip_loc):
-                    q0=q2.q
-                    mindist2 = self.calculate_distance(self.robot, q2.q, flip_loc)
-                if q2.success and self.calculate_distance(self.robot, q2.q, flip_loc) <= 0.01:
-                    break
-                attempts += 1
+            attempts += 1
             print(q2.q)
-        
-       
-        if q2.success:
-            full_qlist.append(qtraj_to_patty)
-            print(f"Moving 2 to Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
+            if (not self.check_trajectory_collision(qtraj_to_patty, self.boundary)) and (q2.success) and (not self.check_trajectory_collision(qtraj_to_patty, self.wallbound)) and (self.calculate_distance(self.robot, q2.q, flip_loc)<0.1):
+                q2_successful = True
+                full_qlist.append(qtraj_to_patty)
+                print(f"Moving 2 to Patty: {self.robot.fkine(q2.q).A[:3, 3]}")
+                break
 
         return full_qlist
 
-    # def move_to_plate(self):
-    #     '''
-    #     TODO: Fix this function 
-    #     '''
-    #     # 1. Move gripper above the patty
-    #     q_above_patty = self.robot.ik(above_patty)
-    #     self.robot.q = q_above_patty
+    def move_to_plate(self, patty, platePose):
+        '''
+        Creates a list of joint values to move the spatula to the patty, pick it up,
+        then move to the plate, and perform the flipping action.
+        It assumes the presence of a predefined plate location.
+        It checks for collisions using the predefined collision self.boundary.
+        '''
+        full_qlist = []
+
+        # 1. Move to Patty Location and Pick Up Patty
+        location = patty.getPose()
+        print(f"Patty Location: x={location[0, 3]}, y={location[1, 3]}, z={location[2, 3]}")
+
+        offset_location = location * self.negpatty_offset * SE3.Rx(-pi)
+        print(f"Offset Patty Location: x={offset_location[0, 3]}, y={offset_location[1, 3]}, z={offset_location[2, 3]}")
+
+        max_attempts = 500  # Maximum number of attempts to find a valid IK solution.
+        attempts = 0
+        q1_successful = False
+
+        while not q1_successful and attempts < max_attempts:
+            q1 = self.robot.ikine_LM(offset_location)
+            qtraj_to_patty = rtb.jtraj(self.robot.q, q1.q, 50).q
+
+            if q1.success and not self.check_trajectory_collision(qtraj_to_patty, self.boundary) and not self.check_trajectory_collision(qtraj_to_patty, self.wallbound):
+                q1_successful = True
+                full_qlist.append(qtraj_to_patty)
+                print(f"Moving to Patty: {self.robot.fkine(q1.q).A[:3, 3]}")
+            else:
+                print(f"Attempt {attempts}: Unable to reach patty. Trying again...")
+
+            attempts += 1
+
+        if not q1_successful:
+            print("Unable to reach patty after maximum attempts.")
+            return []  # Exit if we cannot get a trajectory to the patty
+
+        # 2. Move to Plate Location
+        attempts = 0
+        plate_reached = False
+
+        # while not plate_reached and attempts < max_attempts:
+        #     plate_q = self.robot.ikine_LM(platePose)
+        #     qtraj_to_plate = rtb.jtraj(q1.q, plate_q.q, 50).q
+        #     self.robot.pa
+        #     if plate_q.success and not self.check_trajectory_collision(qtraj_to_plate, self.boundary) and not self.check_trajectory_collision(qtraj_to_plate, self.wallbound):
+        #         plate_reached = True
+        #         full_qlist.append(qtraj_to_plate)
+        #         print(f"Moving to Plate: {self.robot.fkine(plate_q.q).A[:3, 3]}")
+        #     else:
+        #         print(f"Attempt {attempts}: Unable to move to plate. Trying again...")
+
+        #     attempts += 1
+
+        # if not plate_reached:
+        #     print("Unable to move to plate after maximum attempts.")
+        #     return full_qlist  # Return the trajectory list so far
+
+        # 3. Flip Patty at the Plate Location
+        flip_loc = platePose * SE3.Rx(np.pi) * self.spatula_offset * self.negmount_offset  # Flip relative to the plate's pos
+        attempts = 0
+        q0 = q1.q  # Start from the last successful patty pickup pose
+        q2_successful = False
+
+        while not q2_successful and attempts < max_attempts:
+            q2 = self.robot.ikine_LM(flip_loc)
+
+            if q2.success:
+                qtraj_to_flip = rtb.jtraj(q0, q2.q, 50).q
+
+                if not self.check_trajectory_collision(qtraj_to_flip, self.boundary) and not self.check_trajectory_collision(qtraj_to_flip, self.wallbound):
+                    q2_successful = True
+                    full_qlist.append(qtraj_to_flip)
+                    print(f"Flipping at Plate: {self.robot.fkine(q2.q).A[:3, 3]}")
+                else:
+                    print(f"Attempt {attempts}: Unable to compute flip trajectory. Trying again...")
+
+            attempts += 1
+
+        if not q2_successful:
+            print("Unable to compute flipping trajectory after maximum attempts.")
+            # Handle the failure case as needed
+
+        return full_qlist
+def polar_to_cartesian(theta, r):
+    """
+    Convert polar coordinates to Cartesian coordinates.
+    """
+    x = r * np.cos(theta)
+    y = r * np.sin(theta)
+    return x, y
+def compute_global_positions(q_values, transformations):
+    """
+    Compute the global positions for each link given joint values and transformations.
+    
+    Args:
+    - q_values: List of joint values.
+    - transformations: List of SE3 transformations for each link.
+    
+    Returns:
+    - List of global positions for each link.
+    """
+    # Convert the first two joint values from polar to Cartesian coordinates
+    x, y = polar_to_cartesian(q_values[0], q_values[1])
+    
+    # Initialize the base_link's global position
+    global_positions = [(x, y, 0)]
+    
+    # Calculate global positions for subsequent links
+    for i in range(1, len(transformations)):
+        # Extract translation from the transformation matrix
+        dx, dy, dz = transformations[i][:3, 3]
         
-    #     # 2. Descend to grip the patty
-    #     q_grip_patty = self.robot.ik(patty_position)
-    #     self.robot.q = q_grip_patty
-    #     self.robot.gripper.close()
-        
-    #     # 3. Lift and navigate to above the plate
-    #     q_above_plate = self.robot.ik(plate_position)  # Above the plate
-    #     self.robot.q = q_above_plate
-        
-    #     # 4. Lower the patty onto the plate
-    #     q_on_plate = self.robot.ik(above_plate)  # Position on the plate
-    #     self.robot.q = q_on_plate
-    #     self.robot.gripper.open()
-        
-    #     # 5. Return to initial pose or suitable rest pose
-    #     self.robot.q = q_above_plate
-
-    def cook(self, patty):
-        while not self.patty_is_cooked:
-            # Simulate cooking
-            patty.heat(0.5)  # This updates the patty's temperature and color
-
-            # Check if it's time to flip the patty
-            if patty.temperature >= FLIP_TEMP and not self.patty_flipped:
-                self.flip_patty()
-                self.patty_flipped = True
-
-            # Check if patty is cooked
-            if self.patty_flipped and self.patty.temperature >= DONE_TEMP:
-                self.move_to_plate()
-                self.patty_is_cooked = True
-
-            self.env.step(TIME_STEP)
-
+        # Add offset to the previous link's global position
+        x, y, z = global_positions[i-1]
+        global_positions.append((x+dx, y+dy, z+dz))
+    
+    return global_positions
 class CollisionBoundary:
     def __init__(self, x_bounds, y_bounds, z_bounds):
         self.x_bounds = x_bounds
@@ -484,24 +566,28 @@ class CollisionBoundary:
 
     def check_collision(self, point):
         """
-        Checks if the given point collides with the boundary.
+        Checks if the given point collides with the self.boundary.
         
         :param point: A 3-tuple (x, y, z)
         :return: True if there is a collision, False otherwise
         """
         x, y, z = point
-        
+        # if z < self.z_bounds[1]:
+            # print('z ', z)
+            # print('x ',x)
+            # print('y ', y)
         # Check if the point is outside the boundary on any axis
-        if (x < self.x_bounds[0] or x > self.x_bounds[1] or
-            y < self.y_bounds[0] or y > self.y_bounds[1] or
-            z < self.z_bounds[0] or z > self.z_bounds[1]):
-            print("============FALSE=============")
-            print(self.x_bounds[0], " <-- ",x, " --> ", self.x_bounds[1])
-            print(self.y_bounds[0], " <-- ",y, " --> ", self.y_bounds[1])
-            print(self.z_bounds[0], " <-- ",z, " --> ", self.z_bounds[1])
-            print("============FALSE=============")
+        if ((x < self.x_bounds[0] or x > self.x_bounds[1]) or
+            (y < self.y_bounds[0] or y > self.y_bounds[1]) or
+            (z <= self.z_bounds[0] or z > self.z_bounds[1])):
+            # print("============FALSE=============")
+            # print(self.x_bounds[0], " <-- ",x, " --> ", self.x_bounds[1])
+            # print(self.y_bounds[0], " <-- ",y, " --> ", self.y_bounds[1])
+            # print(self.z_bounds[0], " <-- ",z, " --> ", self.z_bounds[1])
+            # print("============FALSE=============")
             return False
         print("============TRUE=============")
+        
         print(self.x_bounds[0], " <-- ",x, " --> ", self.x_bounds[1])
         print(self.y_bounds[0], " <-- ",y, " --> ", self.y_bounds[1])
         print(self.z_bounds[0], " <-- ",z, " --> ", self.z_bounds[1])
