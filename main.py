@@ -146,8 +146,6 @@ def configEnviro(env,pattylist: list[Patty]):
         patty.AddtoEnv(env)
         current_x += x_step
     
- 
-
 
 def main():
     global ESTOP
@@ -196,18 +194,44 @@ def main():
     robot.CookMove(robot.robot.qr)
     robot.AddtoEnv(env)
 
+
+
+    tomatoSaucePath = 'assets/tomatoSauce.stl'
+    tomatoSaucePose = SE3(-1.6, -0.7, 0.67) @ SE3.Rx(pi/2)
+    tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
+    tomatoSauce.color = (1.0,0,0,1.0)
+    env.add(tomatoSauce)
+
+    platePath = 'assets/dinnerPlate.stl'
+    platePose = SE3(-1.4, -0.6, 0.7)
+    plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.0009,0.0009,0.0009))
+    plate1.color = (1.0,1.0,1.0,1.0)
+    env.add(plate1)
+
     assemblyRobot = AssemblyRobot()
-    assemblyRobot.setPose(SE3(0.8, 0.3, 0.4))
+    assemblyRobot.setPose(SE3(-1.39, -0.97, 0.685))
     assemblyRobot.robot.add_to_env(env)
-  
-    shape = Cuboid(scale=[1,0.5,0.5])
-    wall = Cuboid(scale=[20,9.85,10])
-    wall.T = SE3(0.275,6.25,0)
-    # print(shape.to_dict())
-    shape.T = SE3(0.25,1.075,0.275)
-    env.add(shape)
-    env.add(wall)
-    shape._added_to_swift =True
+
+
+    repeats = 5 #how many times to move through the routine
+
+    for n in range(repeats):
+        assemblyRoutine = assemblyRobot.generateRoutine()
+        for i in range(len(assemblyRoutine)):
+            for q in assemblyRoutine[i]:
+                assemblyRobot.robot.q = q
+
+                if(i==4 or i==5 or i==6): #move sauce at these steps
+
+                    fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
+                    tomatoSauce.T = fkine
+
+                if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
+                    fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(-pi/2).A
+                    plate1.T = fkine
+
+                env.step(0.05)
+
 
 
     pattyindex = 0
@@ -320,7 +344,6 @@ def main():
 
         #     env.step(0.05)
     env.hold()
-    # sys.exit(app.exec_())
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)

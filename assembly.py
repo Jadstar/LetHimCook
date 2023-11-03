@@ -5,7 +5,7 @@ THIS IS WHERE THE UR3 BURGER ASSSEMBLY WILL BE DONE BEFORE PUSHING IT INTO MAIN.
 
 import roboticstoolbox as rtb
 from spatialmath import SE3
-from ir_support import UR5
+from ir_support import UR3
 from math import pi, ceil
 from spatialmath.base import *
 from roboticstoolbox import models, jtraj, trapezoidal
@@ -18,11 +18,33 @@ from scipy import linalg
 class AssemblyRobot:
 
     def __init__(self):
-        self.robot = UR5()
+        self.robot = UR3()
         self.currentPoint = [0,0,0]
+        self.robot.q = [pi/2,-pi/2,-pi/5,7*pi/6,pi/2,0]
 
     def setPose(self, position):
         self.robot.base = position
+
+    def generateRoutine(self):
+
+        qMatrixRoutine = []
+
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)) #go to plate
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.3,0.33,0.18], targetRPY=[pi/2,-pi/2,pi], t=1)) #carry to fetch bot
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)) #return plate
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.18,0.28,0.1], targetRPY=[pi/2,0,pi], t=1)) #move to sauce
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.05,0.36,0.2], targetRPY=[-pi/2,0,pi], t=1)) #move sauce over plate and turn over
+        qMatrixRoutine.append(self.move(mode='circle', t=1.5, targetRPY=[-pi/2,0,pi])) #apply sauce
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.18,0.28,0.1], targetRPY=[pi/2,0,pi], t=1)) #return sauce
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)) #return to plate
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.3,-0.33,0.33], targetRPY=[pi/2,3*pi/4,pi], t=1)) #carry plate to window
+
+        return qMatrixRoutine
+
+
+
+
+
 
     def move(self, mode, targetPoint=[0,0,0], targetRPY=[0,0,0], t=3):
                                              # Total time (s)
@@ -30,7 +52,10 @@ class AssemblyRobot:
         steps = int(t/delta_t)                     # No. of steps for simulation
         delta = 2*pi/steps                         # Small angle change
         epsilon = 0.1                              # Threshold value for manipulability/Damped Least Squares
-        W = np.diag([1, 1, 1, 1, 1, 1])      # Weighting matrix for the velocity vector
+        W = np.diag([1, 1, 1, 0.3, 0.3, 0.3])      # Weighting matrix for the velocity vector
+
+        if(steps%2!=0):
+            steps+=1
 
         # 1.2) Allocate array data
         m = np.zeros([steps,1])                    # Array for Measure of Manipulability
@@ -50,7 +75,7 @@ class AssemblyRobot:
         roll, pitch, yaw = tr2rpy(fkine[:3,:3], order='xyz')  #RPY values as a rotation matrix
 
         if(mode=='circle'): 
-            circleRadius = 0.05
+            circleRadius = 0.02
             circleStep = (circleRadius*2)/(steps/2) #((2*pi * circleRadius)/steps)
             circlePoint = x = np.zeros([3,steps])
 
@@ -70,9 +95,9 @@ class AssemblyRobot:
                     x[1,i] = y1 + relY
                     x[2,i] = relZ
 
-                    theta[0,i] = roll                         # Roll angle 
-                    theta[1,i] = pitch                         # Pitch angle
-                    theta[2,i] = yaw                         # Yaw angle
+                    theta[0,i] = targetRPY[0]                  
+                    theta[1,i] = targetRPY[1]           
+                    theta[2,i] = targetRPY[2]
 
                     i+=1
 
@@ -87,12 +112,16 @@ class AssemblyRobot:
                 x[1,i] = (1-s[i])*(relY) + s[i]*(yPos+relativeTargetPoint[1])    # Points in y
                 x[2,i] = (1-s[i])*(relZ) + s[i]*(zPos+relativeTargetPoint[2])     # Points in z
                 #x[2,i] = (1-s[i])*0.4 + s[i]*0.6
-                theta[0,i] = (1-s[i])*(roll) + s[i]*(targetRPY[0])                         # Roll angle 
-                theta[1,i] = (1-s[i])*(pitch) + s[i]*(targetRPY[1])                # Pitch angle
-                theta[2,i] = (1-s[i])*(yaw) + s[i]*(targetRPY[2])                        # Yaw angle
+                # theta[0,i] = (1-s[i])*(roll) + s[i]*(targetRPY[0])                         # Roll angle 
+                # theta[1,i] = (1-s[i])*(pitch) + s[i]*(targetRPY[1])                # Pitch angle
+                # theta[2,i] = (1-s[i])*(yaw) + s[i]*(targetRPY[2])                        # Yaw angle
+                theta[0,i] = targetRPY[0]                  
+                theta[1,i] = targetRPY[1]           
+                theta[2,i] = targetRPY[2]
 
         
-        T = transl(x[:,0]) @ rpy2tr(theta[0,0], theta[1,0], theta[2,0])       # Create transformation of first point and angle     
+        # T = transl(x[:,0]) @ rpy2tr(theta[2,0], theta[0,0], theta[1,0])       # Create transformation of first point and angle     
+        T = fkine       # Create transformation of first point and angle     
         q0 = np.zeros([1,6])                                                  # Initial guess for joint angles
         #q_matrix[0,:] = self.robot.ikine_LM(T, q0).q                                # Solve joint angles to achieve first waypoint
         q_matrix[0,:] = self.robot.ikine_LM(T, self.robot.q, joint_limits=True).q 
@@ -102,7 +131,7 @@ class AssemblyRobot:
         for i in range(steps-1):
             T = self.robot.fkine(q_matrix[i,:]).A                                   # Get forward transformation at current joint state
             delta_x = x[:,i+1] - T[:3,3]                                      # Get position error from next waypoint
-            Rd = rpy2r(theta[0,i+1], theta[1,i+1], theta[2,i+1])              # Get next RPY angles, convert to rotation matrix
+            Rd = rpy2r(theta[2,i+1], theta[0,i+1], theta[1,i+1])              # Get next RPY angles, convert to rotation matrix
             Ra = T[:3,:3]                                                     # Current end-effector rotation matrix
             Rdot = (1/delta_t)*(Rd - Ra)                                      # Calculate rotation matrix error
             S = Rdot @ Ra.T                                                   # Skew symmetric!
@@ -128,5 +157,7 @@ class AssemblyRobot:
                     qdot[i,j] = 0 # Stop the motor
                 
             q_matrix[i+1,:] = q_matrix[i,:] + delta_t*qdot[i,:]               # Update next joint state based on joint velocities
+
+        self.robot.q = q_matrix[-1]
 
         return q_matrix

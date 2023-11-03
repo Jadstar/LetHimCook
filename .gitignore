@@ -2,3 +2,9 @@
 .venv2
 traced_model.pt
 .venv1
+__pycache__/assembly.cpython-310.pyc
+__pycache__/cooking.cpython-310.pyc
+__pycache__/fetch_robot.cpython-310.pyc
+__pycache__/FetchCam.cpython-310.pyc
+__pycache__/GUI.cpython-310.pyc
+
