@@ -540,6 +540,7 @@ class CookingRobot:
             # Handle the failure case as needed
 
         return full_qlist
+    
 def polar_to_cartesian(theta, r):
     """
     Convert polar coordinates to Cartesian coordinates.

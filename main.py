@@ -159,19 +159,19 @@ def main():
     env.launch(realtime=True)
     
 
+    
+
     tomatoSaucePath = 'assets/tomatoSauce.stl'
-    # tomatoSaucePose = SE3(0.79, -0.8, 0.67) @ SE3.Rx(pi/2)
-    tomatoSaucePose = SE3(1.2, 1, 0.5) @ SE3.Rx(pi/2)
+    tomatoSaucePose = SE3(-1.6, -0.7, 0.67) @ SE3.Rx(pi/2)
     tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
     tomatoSauce.color = (1.0,0,0,1.0)
     env.add(tomatoSauce)
-    
-    # Adding plate
-    platePath = 'assets/dinnerPlate.stl'
-    plate1 = geometry.Mesh(platePath, pose=platePose, scale=[0.001,0.001,0.001])
-    # plate1.color = (1,1,1,1)
-    env.add(plate1)
 
+    platePath = 'assets/dinnerPlate.stl'
+    platePose = SE3(-1.4, -0.6, 0.7)
+    plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.0009,0.0009,0.0009))
+    plate1.color = (1.0,1.0,1.0,1.0)
+    env.add(plate1)
       #Generate a number of Patties on Grill
     pattylist = []
     for i in range(NUM_OF_PATTIES):
@@ -196,46 +196,17 @@ def main():
 
 
 
-    tomatoSaucePath = 'assets/tomatoSauce.stl'
-    tomatoSaucePose = SE3(-1.6, -0.7, 0.67) @ SE3.Rx(pi/2)
-    tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
-    tomatoSauce.color = (1.0,0,0,1.0)
-    env.add(tomatoSauce)
-
-    platePath = 'assets/dinnerPlate.stl'
-    platePose = SE3(-1.4, -0.6, 0.7)
-    plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.0009,0.0009,0.0009))
-    plate1.color = (1.0,1.0,1.0,1.0)
-    env.add(plate1)
-
     assemblyRobot = AssemblyRobot()
     assemblyRobot.setPose(SE3(-1.39, -0.97, 0.685))
     assemblyRobot.robot.add_to_env(env)
 
-
-    repeats = 5 #how many times to move through the routine
-
-    for n in range(repeats):
-        assemblyRoutine = assemblyRobot.generateRoutine()
-        for i in range(len(assemblyRoutine)):
-            for q in assemblyRoutine[i]:
-                assemblyRobot.robot.q = q
-
-                if(i==4 or i==5 or i==6): #move sauce at these steps
-
-                    fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
-                    tomatoSauce.T = fkine
-
-                if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
-                    fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(-pi/2).A
-                    plate1.T = fkine
-
-                env.step(0.05)
-
-
-
     pattyindex = 0
     idx= 0
+
+    assemblyRoutine = assemblyRobot.generateRoutine()
+            #Get Plate Ready
+    print(assemblyRoutine[0][49])
+ 
     while idx < len(pattylist):
         while RESET:
             print(TEACH_Q_VALS)
@@ -272,7 +243,8 @@ def main():
 
             idx += 1
 
-    env.hold()
+    # Burgers are ready to be plated
+    assemblyRoutine = assemblyRobot.generateRoutine()
 
     for patty in pattylist:
         while patty.temperature < DONE_TEMP:
@@ -281,19 +253,23 @@ def main():
         # input('ready for next')
         # First part of array finds patty, second part flips
         # Check for Collisions 
-        find_and_flip = robot.move_to_plate(patty, platePose)
+        movetoplate = robot.move_to_plate(patty, platePose)
         
-        print("++++++++++++++++++")
-        print(robot.robot.fkine(robot.robot.q).A[:3, 3])
-        print("++++++++++++++++++")
-        for q in find_and_flip[0]:
+        # print("++++++++++++++++++")
+        # print(robot.robot.fkine(robot.robot.q).A[:3, 3])
+        # print("++++++++++++++++++")
+
+        #Get Plate Ready
+ 
+        
+        for i,q in enumerate(movetoplate[0]):
+            assemblyRobot.robot.q  = assemblyRoutine[0][i]
             robot.CookMove(q)
             env.step(0.06)
             robot.robot.q = q
 
-
         # Perform the flipping action at the plate
-        for q in find_and_flip[1]:
+        for q in movetoplate[1]:
             robot.CookMove(q)
             tr = robot.robot.fkine(q).A
             patty.setPose(tr * robot.flipoffset)
@@ -303,46 +279,24 @@ def main():
         for s in robot.PattyGravity(patty):
             patty.setPose(s)
             env.step(0.01)
+        
+        for i in range(len(assemblyRoutine)):
+            if i >0:
+                for q in (assemblyRoutine[i]):
+                    assemblyRobot.robot.q = q
+                    if(i==4 or i==5 or i==6): #move sauce at these steps
 
-        assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
-        for q in assemblyQMatrix:
-            assemblyRobot.robot.q = q
+                        fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
+                        tomatoSauce.T = fkine
+                        
 
-            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-            tomatoSauce.T = fkine
+                    if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
+                        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(-pi/2).A
+                        print(fkine)
+                        plate1.T = fkine
+                        patty.setPose(fkine)
 
-            env.step(0.05)
-
-        assemblyQMatrix = assemblyRobot.move(mode='circle', t=1)
-
-        for q in assemblyQMatrix:
-            assemblyRobot.robot.q = q
-
-            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-            tomatoSauce.T = fkine
-
-            env.step(0.05)
-
-
-        assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.6,0.6,0.3], targetRPY=[0,pi,0], t=1)
-
-        for q in assemblyQMatrix:
-            assemblyRobot.robot.q = q
-
-            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-            tomatoSauce.T = fkine
-
-            env.step(0.05)
-
-        # assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.22,0.58,0.2], targetRPY=[0,pi,0], t=2)
-
-        # for q in assemblyQMatrix:
-        #     assemblyRobot.robot.q = q
-
-        #     fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        #     tomatoSauce.T = fkine
-
-        #     env.step(0.05)
+                    env.step(0.05)
     env.hold()
 
 if __name__ == "__main__":
