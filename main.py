@@ -1,7 +1,7 @@
 import swift
 import time
 from cooking import CookingRobot,Patty, FLIP_TEMP, DONE_TEMP, TIME_STEP
-from assembly import AssemblyRobot
+from assembly import AssemblyRobot, GripperRobot
 import spatialgeometry as geometry
 from PyQt5.QtWidgets import QApplication
 from spatialmath import SE3
@@ -11,78 +11,12 @@ import random
 from GUI import PattyVisualizer
 from spatialmath.base import transl
 import numpy as np
-
+import roboticstoolbox as rtb
 
 #Determines how many patties will be on grill
 NUM_OF_PATTIES =12
 #Where the floor starts (z axis) on the swift env
 FLOOR_LVL = 0.2
-
-def testpatty(patty, window, env):
-    
-    while True:
-        # If emergency stop is not requested, continue cooking
-        while not window.emergency_stop_requested and patty.temperature < DONE_TEMP:
-            patty.heat(1)  # Increase temperature by 1 degree for testing
-            print(f"Current Patty Temperature: {patty.temperature}°C")
-            window.update_display(patty.temperature)
-            time.sleep(0.2)
-
-        # If the patty is done cooking, break out of the loop
-        if patty.temperature >= DONE_TEMP:
-            break
-
-        # If emergency stop is requested, pause and wait for it to be unset
-        while window.emergency_stop_requested:
-            time.sleep(0.5)
-            
-def movingIntotest():
-    env = swift.Swift()
-    env.launch(realtime=True)
-
-    #Generate a number of Patties on Grill
-    pattylist = []
-    for i in range(NUM_OF_PATTIES):
-        patty = Patty()
-        pattylist.append(patty)
-
-    #Config Environment
-    configEnviro(env,pattylist)
-
-    # Load the robot and cooking items
-    robot = CookingRobot()
-    robot.setPose(SE3(-20,-12,FLOOR_LVL))
-    robot.CookMove(robot.robot.qr )
-    robot.AddtoEnv(env)
-
-    #Robot
-    move_forward =SE3(0,-12,0)
-    move1 = robot.moveToPos(move_forward)
-    q1 = robot.robot.q
-    qtraj = rtb.ctraj(robot.getPose(),move_forward,t=50)
-    input()
-    for q in qtraj:
-        print(q)
-        robot.setPose(q)
-        env.step(0.05)
-        # time.sleep(1)
-    secondmove = SE3(0,-8,0) * SE3.Rz(pi/2)
-    qtraj = rtb.ctraj(robot.getPose(),secondmove,t=50)
-    
-
-    for q in qtraj:
-            print(q)
-            robot.setPose(q)
-            env.step(0.05)
-    thirdmove =SE3(1.1,10,0)* SE3.Rz(pi/2)
-    qtraj = rtb.ctraj(robot.getPose(),thirdmove,t=50)
-    input()
-
-    for q in qtraj:
-            print(q)
-            robot.setPose(q)
-            env.step(0.1)
-    env.hold()
 
 def configEnviro(env,pattylist: list[Patty]):
     '''
@@ -129,23 +63,11 @@ def configEnviro(env,pattylist: list[Patty]):
 
 
 
-def testpatty(robot):
-    # Test heating the patty and visualizing the color change
-    while robot.patty.temperature < DONE_TEMP:
-        robot.patty.heat(1)  # Increase temperature by 1 degree for testing
-        print(f"Current Patty Temperature: {robot.patty.temperature}°C")  # Print the current temperature
-        time.sleep(0.2)
-
-
-
 def main():
     # Initialize the simulation environment
     env = swift.Swift()
     env.launch(realtime=True)
-    
-    patty = Patty(env=env)
-    patty.setPose(SE3(2, 1, 1))
-    patty.AddtoEnv(env)
+   
       #Generate a number of Patties on Grill
     pattylist = []
     for i in range(NUM_OF_PATTIES):
@@ -195,16 +117,24 @@ def main():
     assemblyRobot = AssemblyRobot()
     assemblyRobot.setPose(SE3(-1.39, -0.97, 0.685))
     assemblyRobot.robot.add_to_env(env)
-
-
+    gripper = GripperRobot()
+    gripper.palm_mesh.T = gripper.palm_mesh.T * SE3(0, 0, 0)
+    gripper.finger1.base = gripper.palm_mesh.T
+    gripper.finger2.base = gripper.palm_mesh.T
+    gripper.finger3.base = gripper.palm_mesh.T
+    gripper.addtoEnv(env)  # Add the gripper r
     repeats = 5 #how many times to move through the routine
-
+    qtrajclosed = gripper.closedhandtraj()
+    # Define gripper opening trajectory
+    qtrajopen = gripper.openhandtraj()
+    prev_q = AssemblyRobot.q 
     for n in range(repeats):
         assemblyRoutine = assemblyRobot.generateRoutine()
         for i in range(len(assemblyRoutine)):
             for q in assemblyRoutine[i]:
                 assemblyRobot.robot.q = q
-
+                end_effector_pose = assemblyRobot.fkine(prev_q)
+                gripper.move(end_effector_pose.A)
                 if(i==4 or i==5 or i==6): #move sauce at these steps
 
                     fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
