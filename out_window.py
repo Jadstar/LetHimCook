@@ -200,6 +200,7 @@ class Ui_OutputDialog(QDialog):
         # Create a new QDialog for the popup
         dialog = QDialog(self)
         dialog.setWindowTitle("Fetch Robot Teach Module")
+        dialog.resize(400, dialog.height())  # Set the width to 400 pixels, you can adjust the value as needed
 
         fetch = CookingRobot()
         num_sliders = fetch.getRobotLinks()
@@ -224,7 +225,7 @@ class Ui_OutputDialog(QDialog):
             # Create a label displaying the slider's current value
             value_label = QLabel(f"{slider.value()}")  # Display the initial value
 
-            slider.valueChanged.connect(lambda value, label=value_label, qlim=link.qlim: label.setText(str(qlim[0] + value * (qlim[1] - qlim[0]) / 100)))  # Update label when value changes
+            slider.valueChanged.connect(lambda value, label=value_label, qlim=link.qlim: label.setText(str(round(qlim[0] + value * (qlim[1] - qlim[0]) / 100,3))))  # Update label when value changes
             slider.valueChanged.connect(lambda value, i=i, qlim=link.qlim: self.robotlinks.emit(self.handle_slider_value_changed(value,qlim,i)))  # Update label when value changes
             # Set the slider's name to the link's name
             slider_name_label = QLabel(link.name)

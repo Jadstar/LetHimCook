@@ -207,12 +207,14 @@ def main():
             #Get Plate Ready
     print(assemblyRoutine[0][49])
  
-    while idx < len(pattylist):
+    while pattyindex < len(pattylist):
         while RESET:
             print(TEACH_Q_VALS)
             robot.CookMove(TEACH_Q_VALS)
             env.step(0.05)
-            robot.robot.q = q  # Update the
+            robot.robot.q = q 
+            idx = 0
+
 
         while pattylist[pattyindex].temperature < FLIP_TEMP:
             pattylist[pattyindex].heat(1, env)
@@ -241,19 +243,25 @@ def main():
 
             pattyindex += 1
 
-            idx += 1
-
     # Burgers are ready to be plated
     assemblyRoutine = assemblyRobot.generateRoutine()
 
-    for patty in pattylist:
-        while patty.temperature < DONE_TEMP:
-            patty.heat(1, env)
+    while idx < len(pattylist):
+        while RESET:
+            print(TEACH_Q_VALS)
+            robot.CookMove(TEACH_Q_VALS)
+            env.step(0.05)
+            robot.robot.q = q  # Update the
+            idx = 0
+            
+
+        while pattylist[idx].temperature < DONE_TEMP:
+            pattylist[idx].heat(1, env)
             # time.sleep(5)
         # input('ready for next')
         # First part of array finds patty, second part flips
         # Check for Collisions 
-        movetoplate = robot.move_to_plate(patty, platePose)
+        movetoplate = robot.move_to_plate(pattylist[idx], platePose)
         
         # print("++++++++++++++++++")
         # print(robot.robot.fkine(robot.robot.q).A[:3, 3])
@@ -261,42 +269,48 @@ def main():
 
         #Get Plate Ready
  
-        
-        for i,q in enumerate(movetoplate[0]):
-            assemblyRobot.robot.q  = assemblyRoutine[0][i]
-            robot.CookMove(q)
-            env.step(0.06)
-            robot.robot.q = q
+        if not ESTOP:
+            for i,q in enumerate(movetoplate[0]):
+                if not ESTOP:
+                    assemblyRobot.robot.q  = assemblyRoutine[0][i]
+                    robot.CookMove(q)
+                    env.step(0.06)
+                    robot.robot.q = q
 
-        # Perform the flipping action at the plate
-        for q in movetoplate[1]:
-            robot.CookMove(q)
-            tr = robot.robot.fkine(q).A
-            patty.setPose(tr * robot.flipoffset)
-            env.step(0.06)
+            # Perform the flipping action at the plate
+            for q in movetoplate[1]:
+                if not ESTOP:
+                    robot.CookMove(q)
+                    tr = robot.robot.fkine(q).A
+                    pattylist[idx].setPose(tr * robot.flipoffset)
+                    env.step(0.06)
 
-        # Apply gravity effect to the patty if needed
-        for s in robot.PattyGravity(patty):
-            patty.setPose(s)
-            env.step(0.01)
-        
-        for i in range(len(assemblyRoutine)):
-            if i >0:
-                for q in (assemblyRoutine[i]):
-                    assemblyRobot.robot.q = q
-                    if(i==4 or i==5 or i==6): #move sauce at these steps
+            # Apply gravity effect to the patty if needed
+            for s in robot.PattyGravity(patty):
+                if not ESTOP:
+                    pattylist[idx].setPose(s)
+                    env.step(0.01)
+            
+            for i in range(len(assemblyRoutine)):
+                if i >0:
+                    for q in (assemblyRoutine[i]):
+                        if not ESTOP:
+                            assemblyRobot.robot.q = q
+                            if(i==4 or i==5 or i==6): #move sauce at these steps
 
-                        fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
-                        tomatoSauce.T = fkine
-                        
+                                fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
+                                tomatoSauce.T = fkine
+                                
 
-                    if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
-                        fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(-pi/2).A
-                        print(fkine)
-                        plate1.T = fkine
-                        patty.setPose(fkine)
+                            if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
+                                fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(-pi/2).A
+                                print(fkine)
+                                plate1.T = fkine
+                                pattylist[idx].setPose(fkine)
 
-                    env.step(0.05)
+                            env.step(0.05)
+            idx += 1
+
     env.hold()
 
 if __name__ == "__main__":
