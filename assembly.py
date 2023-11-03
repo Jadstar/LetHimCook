@@ -25,13 +25,34 @@ class AssemblyRobot:
     def setPose(self, position):
         self.robot.base = position
 
+    def generateRoutine(self):
+
+        qMatrixRoutine = []
+
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)) #go to plate
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.3,0.33,0.18], targetRPY=[pi/2,-pi/2,pi], t=1)) #carry to fetch bot
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)) #return plate
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.18,0.28,0.1], targetRPY=[pi/2,0,pi], t=1)) #move to sauce
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.05,0.36,0.2], targetRPY=[-pi/2,0,pi], t=1)) #move sauce over plate and turn over
+        qMatrixRoutine.append(self.move(mode='circle', t=1.5, targetRPY=[-pi/2,0,pi])) #apply sauce
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.18,0.28,0.1], targetRPY=[pi/2,0,pi], t=1)) #return sauce
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)) #return to plate
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.3,-0.33,0.33], targetRPY=[pi/2,3*pi/4,pi], t=1)) #carry plate to window
+
+        return qMatrixRoutine
+
+
+
+
+
+
     def move(self, mode, targetPoint=[0,0,0], targetRPY=[0,0,0], t=3):
                                              # Total time (s)
         delta_t = 0.02                             # Control frequency
         steps = int(t/delta_t)                     # No. of steps for simulation
         delta = 2*pi/steps                         # Small angle change
         epsilon = 0.1                              # Threshold value for manipulability/Damped Least Squares
-        W = np.diag([1, 1, 1, 0.1, 0.1, 0.1])      # Weighting matrix for the velocity vector
+        W = np.diag([1, 1, 1, 0.3, 0.3, 0.3])      # Weighting matrix for the velocity vector
 
         if(steps%2!=0):
             steps+=1
@@ -74,9 +95,9 @@ class AssemblyRobot:
                     x[1,i] = y1 + relY
                     x[2,i] = relZ
 
-                    theta[0,i] = roll                         # Roll angle 
-                    theta[1,i] = pitch                         # Pitch angle
-                    theta[2,i] = yaw                         # Yaw angle
+                    theta[0,i] = targetRPY[0]                  
+                    theta[1,i] = targetRPY[1]           
+                    theta[2,i] = targetRPY[2]
 
                     i+=1
 
@@ -136,5 +157,7 @@ class AssemblyRobot:
                     qdot[i,j] = 0 # Stop the motor
                 
             q_matrix[i+1,:] = q_matrix[i,:] + delta_t*qdot[i,:]               # Update next joint state based on joint velocities
+
+        self.robot.q = q_matrix[-1]
 
         return q_matrix

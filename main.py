@@ -136,6 +136,8 @@ def testpatty(robot):
         print(f"Current Patty Temperature: {robot.patty.temperature}°C")  # Print the current temperature
         time.sleep(0.2)
 
+
+
 def main():
     # Initialize the simulation environment
     env = swift.Swift()
@@ -194,98 +196,25 @@ def main():
     assemblyRobot.setPose(SE3(-1.39, -0.97, 0.685))
     assemblyRobot.robot.add_to_env(env)
 
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)
 
-    for q in assemblyQMatrix:
-        assemblyRobot.robot.q = q
+    repeats = 5 #how many times to move through the routine
 
-        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        # tomatoSauce.T = fkine
+    for n in range(repeats):
+        assemblyRoutine = assemblyRobot.generateRoutine()
+        for i in range(len(assemblyRoutine)):
+            for q in assemblyRoutine[i]:
+                assemblyRobot.robot.q = q
 
-        env.step(0.05)
+                if(i==4 or i==5 or i==6): #move sauce at these steps
 
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.3,0.33,0.18], targetRPY=[pi/2,-pi/2,pi], t=1)
+                    fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
+                    tomatoSauce.T = fkine
 
-    for q in assemblyQMatrix:
-        assemblyRobot.robot.q = q
+                if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
+                    fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(-pi/2).A
+                    plate1.T = fkine
 
-        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        # tomatoSauce.T = fkine
-
-        env.step(0.05)
-
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.13,0.36,0.02], targetRPY=[pi/2,0,pi], t=1)
-
-    for q in assemblyQMatrix:
-        assemblyRobot.robot.q = q
-
-        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        # tomatoSauce.T = fkine
-
-        env.step(0.05)
-
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.13,0.36,0.1], targetRPY=[pi/2,0,pi], t=0.5)
-
-    for q in assemblyQMatrix:
-        assemblyRobot.robot.q = q
-
-        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        # tomatoSauce.T = fkine
-
-        env.step(0.05)
-
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[-0.18,0.28,0.1], targetRPY=[pi/2,0,pi], t=1)
-
-    for q in assemblyQMatrix:
-        assemblyRobot.robot.q = q
-
-        # fkine = assemblyRobot.robot.fkine(q).A @ transl(0,-0.1,0)
-        # tomatoSauce.T = fkine
-
-        env.step(0.05)
-
-    assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.0,0.36,0.2], targetRPY=[pi/2,0,pi], t=1)
-
-    for q in assemblyQMatrix:
-        assemblyRobot.robot.q = q
-
-        fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
-        tomatoSauce.T = fkine
-
-        env.step(0.05)
-
-    # assemblyQMatrix = assemblyRobot.move(mode='point', targetPoint=[0.0,0.36,0.2], targetRPY=[-pi/2,pi/2,pi], t=2)
-
-    # for q in assemblyQMatrix:
-    #     assemblyRobot.robot.q = q
-
-    #     fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
-    #     tomatoSauce.T = fkine
-
-    #     env.step(0.05)
-
-    for q in np.arange(-pi/2, pi/2, pi/25):
-        assemblyRobot.robot.q[5] = q
-        fkine = assemblyRobot.robot.fkine(assemblyRobot.robot.q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
-        tomatoSauce.T = fkine
-        env.step(0.05)
-
-
-    assemblyQMatrix = assemblyRobot.move(mode='circle', t=1.5)
-
-    for q in assemblyQMatrix:
-        assemblyRobot.robot.q = q
-
-        fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
-        tomatoSauce.T = fkine
-
-        env.step(0.05)
-
-    for q in np.arange(pi/2, -pi/2, pi/25):
-        assemblyRobot.robot.q[5] = q
-        fkine = assemblyRobot.robot.fkine(assemblyRobot.robot.q).A @ transl(0.1,0,0) @ SE3.Rz(pi/2).A
-        tomatoSauce.T = fkine
-        env.step(0.05)
+                env.step(0.05)
 
 
 
