@@ -129,7 +129,7 @@ class Ui_OutputDialog(QDialog):
         cropped_imgs = self.detect_thread.getCroppedImgs()
         self.patties_detected_signal.emit(cropped_imgs)  # Emit the signal with the cropped images
         
-        self.close()  # Close the dialog
+        # self.close()  # Close the dialog
     def show_available_webcams(self):
         '''
         Shows the available webcams connected to the device

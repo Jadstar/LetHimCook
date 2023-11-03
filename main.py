@@ -146,6 +146,29 @@ def configEnviro(env,pattylist: list[Patty]):
         patty.AddtoEnv(env)
         current_x += x_step
     
+    barrierPath = 'assets/barrier.stl'
+    barrierPose = SE3(-1.4, 2.5, 0) *SE3.Rz(-pi)
+    barrier = geometry.Mesh(barrierPath, base=barrierPose, scale=(0.0035,0.0035,0.0035))
+    barrier.color = (1.0,1.0,1.0,1.0)
+    env.add(barrier)
+ 
+    buttonPath = 'assets/EmergencyButton.stl'
+    buttonPose = SE3(1.4, 0.6, 0)*SE3.Rz(-pi)
+    button = geometry.Mesh(buttonPath, base=buttonPose, scale=(0.0005,0.0005,0.0005))
+    button.color = (1.0,1.0,1.0,1.0)
+    env.add(button)
+ 
+    extinguisherPath = 'assets/extinguisher.stl'
+    extinguisherPose = SE3(1.4, 0.6, 0) *SE3.Rx(pi/2)*SE3.Rz(-pi)
+    extinguisher = geometry.Mesh(extinguisherPath, base=extinguisherPose, scale=(1.0,1.0,1.0))
+    extinguisher.color = (1.0,0.0,0.0,1.0)
+    env.add(extinguisher)
+ 
+    # sprinklerPath = 'assets/sprinkler.stl'
+    # sprinklerPose = SE3(-1.4, -0.6, 0.7)
+    # sprinkler = geometry.Mesh(sprinklerPath, base=sprinklerPose, scale=(1.0,1.0,1.0))
+    # sprinkler.color = (1.0,0.0,0.0,1.0)
+    # env.add(sprinkler)
 
 def main():
     global ESTOP
@@ -162,13 +185,17 @@ def main():
     
 
     tomatoSaucePath = 'assets/tomatoSauce.stl'
-    tomatoSaucePose = SE3(-1.6, -0.7, 0.67) @ SE3.Rx(pi/2)
+    tomatoSaucePose = SE3(1.6, 0.7, 0.47) @ SE3.Rx(pi/2)
     tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
     tomatoSauce.color = (1.0,0,0,1.0)
     env.add(tomatoSauce)
-
+    benchpath = 'assets/workingBench.stl'
+    benchpose = SE3(0.8, 0.3, 0) *SE3.Rx(pi/2) *SE3.Ry(pi/2)
+    bench = geometry.Mesh(benchpath, base=benchpose, scale=(0.0009,0.0009,0.0009))
+    env.add(bench)
+    
     platePath = 'assets/dinnerPlate.stl'
-    platePose = SE3(-1.4, -0.6, 0.7)
+    platePose = SE3(1.4, 0.6, 0.5)
     plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.0009,0.0009,0.0009))
     plate1.color = (1.0,1.0,1.0,1.0)
     env.add(plate1)
@@ -197,7 +224,7 @@ def main():
 
 
     assemblyRobot = AssemblyRobot()
-    assemblyRobot.setPose(SE3(-1.39, -0.97, 0.685))
+    assemblyRobot.setPose(SE3(1.39,0.97 , 0.485))
     assemblyRobot.robot.add_to_env(env)
 
     pattyindex = 0
