@@ -66,7 +66,7 @@ class Patty:
         delta_temp: Amount of temperature increase.
         '''
         self.temperature += delta_temp
-        self.update_color(env)
+        #self.update_color(env) #SEEMS TO BREAK THE THREADS
 
     def get_color(self, temp):
         '''
@@ -111,6 +111,7 @@ class Patty:
         newpatty = geometry.Mesh('assets/BurgerPatty.stl', pose=SE3(self.mesh.T), scale=self.scale, color=new_color)
         oldmesh = self.mesh
         self.mesh = newpatty
+        print("UPDATE_COLOR")
         env.add(self.mesh)
         
 

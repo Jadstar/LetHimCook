@@ -19,6 +19,7 @@ from spatialgeometry import Cuboid
 from spatialmath.base import transl
 import numpy as np
 from assembly import AssemblyRobot
+import time
 
 # import mainwindow
 
@@ -28,7 +29,25 @@ ESTOP = False
 RESET = True
 PICKUP_THRESHOLD = 0.05
 TEACH_Q_VALS= [0,0,0,0,0,0,0,0,0,0]
+
 pattylist = []
+env = swift.Swift()
+lock = threading.Lock()
+condition = threading.Condition()
+assemblyBotWaiting = False
+assemblyBotCarryingPatty = False
+idx = 0 #used to track the current patty being moved the assemblyBOt
+
+#could definitely be somehwere better, but needed to make global
+tomatoSaucePath = 'assets/tomatoSauce.stl'
+tomatoSaucePose = SE3(1.6, 0.7, 0.47) @ SE3.Rx(pi/2)
+tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
+tomatoSauce.color = (1.0,0,0,1.0)
+
+platePath = 'assets/dinnerPlate.stl'
+platePose = SE3(1.4, 0.6, 0.5)
+plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.0009,0.0009,0.0009))
+plate1.color = (1.0,1.0,1.0,1.0)
 
 class Ui_Dialog(QDialog):
     '''
@@ -155,16 +174,23 @@ def configEnviro(env,pattylist: list[Patty]):
     env.add(barrier)
  
     buttonPath = 'assets/EmergencyButton.stl'
-    buttonPose = SE3(1.4, 0.6, 0)*SE3.Rz(-pi)
+    buttonPose = SE3(-1.45, 1.9, 0.1)*SE3.Ry(pi/2)
     button = geometry.Mesh(buttonPath, base=buttonPose, scale=(0.0005,0.0005,0.0005))
-    button.color = (1.0,1.0,1.0,1.0)
+    button.color = (0.0,1.0,0.0,1.0)
     env.add(button)
  
     extinguisherPath = 'assets/extinguisher.stl'
-    extinguisherPose = SE3(1.4, 0.6, 0) *SE3.Rx(pi/2)*SE3.Rz(-pi)
+    extinguisherPose = SE3(-1.4, 1.8, 0) *SE3.Rx(pi/2)
     extinguisher = geometry.Mesh(extinguisherPath, base=extinguisherPose, scale=(1.0,1.0,1.0))
     extinguisher.color = (1.0,0.0,0.0,1.0)
     env.add(extinguisher)
+
+    benchpath = 'assets/workingBench.stl'
+    benchpose = SE3(0.8, 0.3, 0) *SE3.Rx(pi/2) *SE3.Ry(pi/2)
+    bench = geometry.Mesh(benchpath, base=benchpose, scale=(0.0009,0.0009,0.0009))
+    env.add(bench)
+
+
  
     # sprinklerPath = 'assets/sprinkler.stl'
     # sprinklerPose = SE3(-1.4, -0.6, 0.7)
@@ -172,130 +198,161 @@ def configEnviro(env,pattylist: list[Patty]):
     # sprinkler.color = (1.0,0.0,0.0,1.0)
     # env.add(sprinkler)
 
-def CookingRobotWorkflow(robot, env):
-    pattyindex=0
-    idx = 0
-    while pattyindex < len(pattylist):
-            while RESET:
-                print(TEACH_Q_VALS)
-                robot.CookMove(TEACH_Q_VALS)
-                env.step(0.05)
-                robot.robot.q = q 
-                idx = 0
+def CookingRobotWorkflow(robot):
+    global idx
+    global assemblyBotCarryingPatty
+    while(True):
+
+        #pattyindex=0
+        for pattyindex in range(idx, len(pattylist)):
 
 
-            while pattylist[pattyindex].temperature < FLIP_TEMP:
-                pattylist[pattyindex].heat(1, env)
-            if not ESTOP:
-                find_and_flip = robot.flip_patty(pattylist[pattyindex])
+                while RESET:
+                    print(TEACH_Q_VALS)
+                    robot.CookMove(TEACH_Q_VALS)
+                    stepEnvironment()
+                    robot.robot.q = q 
 
-                for i, q in enumerate(find_and_flip[0]):
-                    if not ESTOP:
-                        robot.CookMove(q)
-                        #env.step(0.06)
-                        robot.robot.q = q  # Update the robot's current configuration
+                    idx = 0
 
-                for i, q in enumerate(find_and_flip[1]):
-                    if not ESTOP:
-                        robot.CookMove(q)
-                        tr = robot.robot.fkine(q).A
-                        # diff = np.linalg.norm(pattylist[pattyindex].getPose() - tr)
-                        # if diff <= PICKUP_THRESHOLD:
-                        pattylist[pattyindex].setPose(tr * robot.flipoffset)
-                        env.step(0.06)
 
-                for s in robot.PattyGravity(pattylist[pattyindex]):
-                    if not ESTOP:
-                        pattylist[pattyindex].setPose(s)
-                        env.step(0.01)
+                while pattylist[pattyindex].temperature < FLIP_TEMP:
+                    pattylist[pattyindex].heat(1, env)
 
-                pattyindex += 1
-    while idx < len(pattylist):
-        while RESET:
-            print(TEACH_Q_VALS)
-            robot.CookMove(TEACH_Q_VALS)
-            env.step(0.05)
-            robot.robot.q = q  # Update the
-            idx = 0
-            
+                pattylist[pattyindex].update_color(env)
 
-        while pattylist[idx].temperature < DONE_TEMP:
-            pattylist[idx].heat(1, env)
-            # time.sleep(5)
-        # input('ready for next')
-        # First part of array finds patty, second part flips
-        # Check for Collisions 
-        movetoplate = robot.move_to_plate(pattylist[idx], platePose)
-        
-        # print("++++++++++++++++++")
-        # print(robot.robot.fkine(robot.robot.q).A[:3, 3])
-        # print("++++++++++++++++++")
-
-        #Get Plate Ready
- 
-        if not ESTOP:
-            for i,q in enumerate(movetoplate[0]):
                 if not ESTOP:
-                    #assemblyRobot.robot.q  = assemblyRoutine[0][i]
-                    robot.CookMove(q)
-                    env.step(0.06)
-                    robot.robot.q = q
+                    find_and_flip = robot.flip_patty(pattylist[pattyindex])
 
-            # Perform the flipping action at the plate
-            for q in movetoplate[1]:
-                if not ESTOP:
-                    robot.CookMove(q)
-                    tr = robot.robot.fkine(q).A
-                    pattylist[idx].setPose(tr * robot.flipoffset)
-                    env.step(0.06)
+                    for i, q in enumerate(find_and_flip[0]):
+                        if not ESTOP:
+                            robot.CookMove(q)
+                            robot.robot.q = q  # Update the robot's current configuration
+                            stepEnvironment(0.06)
 
-            # Apply gravity effect to the patty if needed
-            for s in robot.PattyGravity(pattylist[idx]): ####   Was PattyGravity(patty), check if PattyGravity(pattylist[idx]) is actually correct
-                if not ESTOP:
-                    pattylist[idx].setPose(s)
-                    env.step(0.01)
-            
-            # for i in range(len(assemblyRoutine)):
-            #     if i >0:
-            #         for q in (assemblyRoutine[i]):
-            #             if not ESTOP:
-            #                 assemblyRobot.robot.q = q
-            #                 if(i==4 or i==5 or i==6): #move sauce at these steps
+                    for i, q in enumerate(find_and_flip[1]):
+                        if not ESTOP:
+                            robot.CookMove(q)
+                            tr = robot.robot.fkine(q).A
+                            # diff = np.linalg.norm(pattylist[pattyindex].getPose() - tr)
+                            # if diff <= PICKUP_THRESHOLD:
+                            pattylist[pattyindex].setPose(tr * robot.flipoffset)
+                            stepEnvironment(0.06)
 
-            #                     fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
-            #                     tomatoSauce.T = fkine
-                                
+                    for s in robot.PattyGravity(pattylist[pattyindex]):
+                        if not ESTOP:
+                            pattylist[pattyindex].setPose(s)
+                            stepEnvironment(0.01)
 
-            #                 if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
-            #                     fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(-pi/2).A
-            #                     print(fkine)
-            #                     plate1.T = fkine
-            #                     pattylist[idx].setPose(fkine)
+                    pattyindex += 1
 
-            #                 env.step(0.05)
-            idx += 1
-
-def AssemblyRobotWorkflow(assemblyRobot, env):
-    assemblyRoutine = assemblyRobot.generateRoutine()
-
-    for i in range(len(assemblyRoutine)):
-        for q in (assemblyRoutine[i]):
-            if not ESTOP:
-                assemblyRobot.robot.q = q
-                if(i==4 or i==5 or i==6): #move sauce at these steps
-
-                    fkine = assemblyRobot.robot.fkine(q).A @ transl(0.1,0,0.038) @ SE3.Rz(pi/2).A
-                    #tomatoSauce.T = fkine
+                global assemblyBotWaiting
+                if(assemblyBotWaiting):
+                    while pattylist[idx].temperature < DONE_TEMP:
+                        pattylist[idx].heat(1, env)
+                        pattylist[idx].update_color(env)
+                        # time.sleep(5)
+                    # input('ready for next')
+                    # First part of array finds patty, second part flips
+                    # Check for Collisions 
+                    movetoplate = robot.move_to_plate(pattylist[idx], plate1.T)
                     
+                    # print("++++++++++++++++++")
+                    # print(robot.robot.fkine(robot.robot.q).A[:3, 3])
+                    # print("++++++++++++++++++")
 
-                if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
-                    fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(-pi/2).A
-                    print(fkine)
-                    #plate1.T = fkine
-                    #pattylist[idx].setPose(fkine)
+                    #Get Plate Ready
+            
+                    if not ESTOP:
+                        for i,q in enumerate(movetoplate[0]):
+                            if not ESTOP:
+                                #assemblyRobot.robot.q  = assemblyRoutine[0][i]
+                                robot.CookMove(q)
+                                stepEnvironment(0.06)
+                                robot.robot.q = q
 
-                env.step(0.05)
+                        # Perform the flipping action at the plate
+                        for q in movetoplate[1]:
+                            if not ESTOP:
+                                robot.CookMove(q)
+                                tr = robot.robot.fkine(q).A
+                                pattylist[idx].setPose(tr * robot.flipoffset)
+                                stepEnvironment(0.06)
 
+                        # Apply gravity effect to the patty if needed
+                        for s in robot.PattyGravity(pattylist[idx]): ####   Was PattyGravity(patty), check if PattyGravity(pattylist[idx]) is actually correct
+                            if not ESTOP:
+                                pattylist[idx].setPose(s)
+                                stepEnvironment(0.01)
+
+                        assemblyBotCarryingPatty = True
+                        with condition:
+                            condition.notify() #notify assemblyBot
+
+
+def AssemblyRobotWorkflow(assemblyRobot):
+    global assemblyBotCarryingPatty
+    global idx
+
+    IsFirstMovement = True
+    while(True):
+        assemblyRoutine = assemblyRobot.generateRoutine()
+        for i in range(len(assemblyRoutine)):
+
+            if(i==2): #holding out plate to cooking bot
+                with condition:
+                    global assemblyBotWaiting
+                    assemblyBotWaiting = True
+                    condition.wait()
+                    assemblyBotWaiting = False
+
+
+            for q in (assemblyRoutine[i]):
+                if not ESTOP:
+                    assemblyRobot.robot.q = q
+                    if(i==4 or i==5 or i==6): #move sauce at these steps
+
+                        fkine = assemblyRobot.robot.fkine(q).A @ transl(-0.1,0,0.038) @ SE3.Rz(pi/2).A @ SE3.Rx(pi).A
+                        tomatoSauce.T = fkine
+                        
+                    if not IsFirstMovement:
+                        if(i==0 or i==1 or i==2 or i==8): #move plate at these steps
+                            fkine = assemblyRobot.robot.fkine(q).A @ transl(0,0,0.14) @ SE3.Ry(pi/2).A
+                            #print(fkine)
+                            plate1.T = fkine
+                            
+                            if(assemblyBotCarryingPatty):
+                                
+                                pattylist[idx].setPose(fkine)
+                        
+
+
+                    stepEnvironment(0.05)
+                    time.sleep(0.05)
+            IsFirstMovement = False
+
+            if(i==8):
+
+                assemblyBotCarryingPatty=False
+                idx+=1
+
+
+def stepEnvironment(t=0.05):
+    if(lock.acquire(blocking=False)):
+        try:
+            env.step(t)
+            pass
+        finally:
+            lock.release()
+            pass
+    else:
+        print("skipping env step")
+
+
+def EnvironmentThread():
+    while(True):
+        env.step(0.05)
+        time.sleep(1)
 
 def main():
     global ESTOP
@@ -305,27 +362,13 @@ def main():
     # add assembly bench
   
     # Initialize the simulation environment
-    env = swift.Swift()
+
     env.launch(realtime=True)
     
 
     
 
-    tomatoSaucePath = 'assets/tomatoSauce.stl'
-    tomatoSaucePose = SE3(1.6, 0.7, 0.47) @ SE3.Rx(pi/2)
-    tomatoSauce = geometry.Mesh(tomatoSaucePath, base=tomatoSaucePose, scale=(0.001,0.001,0.001))
-    tomatoSauce.color = (1.0,0,0,1.0)
     env.add(tomatoSauce)
-
-    benchpath = 'assets/workingBench.stl'
-    benchpose = SE3(0.8, 0.3, 0) *SE3.Rx(pi/2) *SE3.Ry(pi/2)
-    bench = geometry.Mesh(benchpath, base=benchpose, scale=(0.0009,0.0009,0.0009))
-    env.add(bench)
-    
-    platePath = 'assets/dinnerPlate.stl'
-    platePose = SE3(1.4, 0.6, 0.5)
-    plate1 = geometry.Mesh(platePath, base=platePose, scale=(0.0009,0.0009,0.0009))
-    plate1.color = (1.0,1.0,1.0,1.0)
     env.add(plate1)
       #Generate a number of Patties on Grill
 
@@ -356,8 +399,9 @@ def main():
     assemblyRobot.setPose(SE3(1.39,0.97 , 0.485))
     assemblyRobot.robot.add_to_env(env)
 
-    cookingThread = threading.Thread(target=CookingRobotWorkflow, args=(robot, env))
-    assemblyThread = threading.Thread(target=AssemblyRobotWorkflow, args=(assemblyRobot, env))
+    cookingThread = threading.Thread(target=CookingRobotWorkflow, args=(robot,))
+    assemblyThread = threading.Thread(target=AssemblyRobotWorkflow, args=(assemblyRobot,))
+    envThread = threading.Thread(target=EnvironmentThread)
 
     #CookingRobotWorkflow(robot, env)    
 
@@ -367,9 +411,11 @@ def main():
 
     cookingThread.start()
     assemblyThread.start()
+    #envThread.start()
 
     cookingThread.join()
     assemblyThread.join()
+    #envThread.join()
     
 
     env.hold()

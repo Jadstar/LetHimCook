@@ -30,11 +30,11 @@ class AssemblyRobot:
         qMatrixRoutine = []
 
         qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.13,-0.36,0.02], targetRPY=[-pi/2,0,pi], t=1)) #go to plate
-        qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.3,-0.33,0.18], targetRPY=[-pi/2,pi/2,pi], t=1)) #carry to fetch bot
+        qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.3,-0.33,0.18], targetRPY=[-pi/2,-pi/2,pi], t=1)) #carry to fetch bot
         qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.13,-0.36,0.02], targetRPY=[-pi/2,0,pi], t=1)) #return plate
         qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.18,-0.28,0.1], targetRPY=[-pi/2,0,pi], t=1)) #move to sauce
         qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.05,-0.36,0.2], targetRPY=[pi/2,0,pi], t=1)) #move sauce over plate and turn over
-        qMatrixRoutine.append(self.move(mode='circle', t=1.5, targetRPY=[-pi/2,0,pi])) #apply sauce
+        qMatrixRoutine.append(self.move(mode='circle', t=1.5, targetRPY=[pi/2,0,pi])) #apply sauce
         qMatrixRoutine.append(self.move(mode='point', targetPoint=[0.18,-0.28,0.1], targetRPY=[-pi/2,0,pi], t=1)) #return sauce
         qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.13,-0.36,0.02], targetRPY=[-pi/2,0,pi], t=1)) #return to plate
         qMatrixRoutine.append(self.move(mode='point', targetPoint=[-0.3,0.33,0.33], targetRPY=[-pi/2,3*pi/4,pi], t=1)) #carry plate to window
