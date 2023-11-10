@@ -172,6 +172,12 @@ def configEnviro(env,pattylist: list[Patty]):
     barrier = geometry.Mesh(barrierPath, base=barrierPose, scale=(0.0035,0.0035,0.0035))
     barrier.color = (1.0,1.0,1.0,1.0)
     env.add(barrier)
+
+    barrierPath2 = 'assets/barrier.stl'
+    barrierPose2 = SE3(-0.6, 1.5, 0.4) *SE3.Rz(-pi) * SE3.Ry(pi/2)
+    barrier2 = geometry.Mesh(barrierPath2, base=barrierPose2, scale=(0.0035,0.0035,0.0035))
+    barrier2.color = (0.0,1.0,0.0,0.5)
+    env.add(barrier2)
  
     buttonPath = 'assets/EmergencyButton.stl'
     buttonPose = SE3(-1.45, 1.9, 0.1)*SE3.Ry(pi/2)
