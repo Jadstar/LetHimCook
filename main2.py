@@ -180,13 +180,13 @@ def configEnviro(env,pattylist: list[Patty]):
     env.add(barrier2)
  
     buttonPath = 'assets/EmergencyButton.stl'
-    buttonPose = SE3(-1.45, 1.9, 0.1)*SE3.Ry(pi/2)
+    buttonPose = SE3(-0.25, 2.9, 0.5)*SE3.Ry(pi/2)
     button = geometry.Mesh(buttonPath, base=buttonPose, scale=(0.0005,0.0005,0.0005))
     button.color = (0.0,1.0,0.0,1.0)
     env.add(button)
  
     extinguisherPath = 'assets/extinguisher.stl'
-    extinguisherPose = SE3(-1.4, 1.8, 0) *SE3.Rx(pi/2)
+    extinguisherPose = SE3(-0.25, 2.8, 0.4) *SE3.Rx(pi/2)
     extinguisher = geometry.Mesh(extinguisherPath, base=extinguisherPose, scale=(1.0,1.0,1.0))
     extinguisher.color = (1.0,0.0,0.0,1.0)
     env.add(extinguisher)
